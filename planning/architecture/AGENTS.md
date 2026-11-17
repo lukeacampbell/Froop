@@ -10,6 +10,7 @@ The rules in `planning/AGENTS.md` apply here, along with the file formats, ID pr
 architecture/
 ├── AGENTS.md                      # This file
 ├── inputs/                        # RFC 0001 and its diagram (read-only); see inputs/AGENTS.md
+├── revised-rfc/                   # The current RFC, with every Accepted decision applied; see revised-rfc/AGENTS.md
 └── <area>/
     ├── AGENTS.md                  # How to work in this area (guide, not content)
     ├── architecture.md            # What the area is, what was given, what we decided, its boundaries
@@ -86,7 +87,7 @@ Work through these steps in order. Each step builds on the one before it.
    - How is it deployed, configured, and monitored? (Check this with `build-and-operation`.)
    - What user data does it touch, and is that data scoped to the user's Cognito `sub`?
    - What happens when it fails? Consider retries, the DLQ, and whether it can safely run twice.
-4. **Record decisions.** Turn each recommendation the owner wants to act on into a decision. Reviewing findings with the owner one at a time works better than proposing everything at once.
+4. **Record decisions.** Turn each recommendation the owner wants to act on into a decision. Reviewing findings with the owner one at a time works better than proposing everything at once. When a decision is Accepted, update the revised RFC (see "Keeping the Revised RFC Current").
 5. **Define the interfaces.** List everything the area exposes and consumes, following "Coordinating Across Areas" below.
 6. **Write the implementation plan.** Break the accepted design into ordered tasks, with dependencies and acceptance criteria that can be tested. Tasks may depend on tasks in other areas. Cite them by ID, and record an Open Question if that task doesn't exist yet.
 7. **Request approval.** Set `Area state: In Review`, then list the root Phase 1 exit criteria with any that aren't met. The owner sets `Approved`.
@@ -145,6 +146,22 @@ Questions that span areas or affect the whole architecture. They use the `SYS-Q`
   - Owner: group
   - Blocks: OPS-I01
 
+## Keeping the Revised RFC Current
+
+`inputs/` holds the RFC as it was submitted, and it never changes. `revised-rfc/` holds the RFC as it stands **now**. It must stay current, because teammates, reviewers, and Phase 2 agents read it to understand the system without going through every area's decision log.
+
+- **Update it whenever an open question is resolved by an Accepted decision.** That also covers an Accepted decision that wasn't prompted by an open question, and one that supersedes another. Do it in the same change, or right after.
+- **What to update:** every affected section of `revised-rfc/Froop_revised_architecture.md`, plus a Change Log row. If the diagram changes, also update `architecture.drawio` and re-export `architecture.png`.
+- **Only Accepted decisions go in.** Text waiting on an open question stays as it is and is marked *(pending XX-Q00)*.
+- **Follow `revised-rfc/AGENTS.md`** for the full rules and the steps to export the diagram.
+
+An area can't be set to `In Review` while it has Accepted decisions missing from the revised RFC.
+
 ## When This Phase Is Done
 
-An area is done when its owner sets it to `Approved` and it meets the Phase 1 exit criteria in `planning/AGENTS.md`. The phase is done when every area is approved, every interface is agreed by both of its owners, every System Open Question is answered, and the group confirms the move to Phase 2.
+An area is done when its owner sets it to `Approved` and it meets the Phase 1 exit criteria in `planning/AGENTS.md`. The phase is done when:
+- every area is approved
+- every interface is agreed by both of its owners
+- every System Open Question is answered
+- the revised RFC includes every Accepted decision and has no *(pending)* markers left
+- the group confirms the move to Phase 2

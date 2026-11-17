@@ -14,14 +14,14 @@ The experience bank holds everything a student has done, in the student's own wo
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-12
+Last reviewed: 2026-11-16
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Architecture (as given), Architecture Review, Decisions, Interfaces, Open Questions | Draft. Scope, Interfaces, and Open Questions are drafted. The as-given text hasn't been transcribed yet. |
+| `architecture.md` | Scope, Architecture (as given), Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-006 and EB-010 to EB-013 are Accepted. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 
 Where to look:

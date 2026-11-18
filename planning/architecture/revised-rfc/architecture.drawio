@@ -265,7 +265,7 @@
         <mxCell id="c64" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#6b7280;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Student&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;inbox&lt;/font&gt;" vertex="1">
           <mxGeometry height="58" width="190" x="40" y="770" as="geometry" />
         </mxCell>
-        <mxCell id="c65" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;SES&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;email digest&lt;/font&gt;" vertex="1">
+        <mxCell id="c65" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;SES&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;PDF email · digest links&lt;/font&gt;" vertex="1">
           <mxGeometry height="58" width="190" x="270" y="770" as="geometry" />
         </mxCell>
         <mxCell id="c66" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Notifier&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;Lambda · instant/hourly/daily&lt;/font&gt;" vertex="1">
@@ -274,7 +274,7 @@
         <mxCell id="c67" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Renderer&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;Lambda · LaTeX image · 1 page&lt;/font&gt;" vertex="1">
           <mxGeometry height="58" width="190" x="1190" y="770" as="geometry" />
         </mxCell>
-        <mxCell id="c68" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;S3 · resumes/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;private · lifecycle 30 d&lt;/font&gt;" vertex="1">
+        <mxCell id="c68" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;S3 · resumes/&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;private · kept with match&lt;/font&gt;" vertex="1">
           <mxGeometry height="58" width="190" x="960" y="850" as="geometry" />
         </mxCell>
         <mxCell id="c69" edge="1" parent="1" style="edgeStyle=none;html=1;strokeColor=#334155;strokeWidth=1.6;fontSize=11;labelBackgroundColor=#f8fafc;endArrow=block;endFill=1;" value="digest schedule">

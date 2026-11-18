@@ -13,13 +13,15 @@ architecture/
 ├── revised-rfc/                   # The current RFC, with every Accepted decision applied; see revised-rfc/AGENTS.md
 └── <area>/
     ├── AGENTS.md                  # How to work in this area (guide, not content)
-    ├── architecture.md            # What the area is, what was given, what we decided, its boundaries
+    ├── architecture.md            # What the area is, what was first proposed, what we decided, its boundaries
+    ├── architecture.drawio        # The area's current design diagram (source)
+    ├── architecture.png           # The diagram exported from the .drawio file, embedded in architecture.md
     └── implementation-plan.md     # How we'll build it
 ```
 
-### The Three Area Files
+### The Area Files
 
-Every area has the same three files. Read them in this order, because each one builds on the one before it.
+Every area has the same three documents, plus a diagram (see "Keeping Area Diagrams Current"). Read them in this order, because each one builds on the one before it.
 
 **1. `<area>/AGENTS.md`: how to work in this area.**
 - **What it is:** a guide and working agreement between the area's owner and the agents working in it. It holds:
@@ -32,11 +34,12 @@ Every area has the same three files. Read them in this order, because each one b
 - **Update it when** the area's state changes, or when the owner changes how agents should work there.
 - **What it isn't:** a place for design or implementation content. No services, schemas, interfaces, or open questions. Those go in `architecture.md`.
 
-**2. `<area>/architecture.md`: what the area is, what was given, and what we decided.**
+**2. `<area>/architecture.md`: what the area is, what was first proposed, and what we decided.**
 - **Scope:** what the area owns and what it doesn't, naming the owner of each excluded item.
-- **Architecture (as given):** the area's part of RFC 0001, transcribed without changes and cited by page. It changes only to fix transcription errors.
+- **Current Design Diagram:** `architecture.png`, exported from `architecture.drawio`, showing the design as it stands now.
+- **Initial Architecture:** the area's part of RFC 0001 *as originally submitted*, transcribed without changes and cited by page. It's a frozen baseline. It is **never** updated when decisions change the design, so reviewers can always see what changed and why. The *current* design is the Decisions in this file, and the whole current system is in `revised-rfc/`. It changes only to fix transcription errors.
 - **Architecture Review:** findings about the given design, each written as finding → impact → recommendation.
-- **Decisions:** the append-only log of choices, each `Proposed` or `Accepted`. This is the design the area will actually build. Where a decision differs from the as-given text, the decision wins.
+- **Decisions:** the append-only log of choices, each `Proposed` or `Accepted`. This is the design the area will actually build. Where a decision differs from the Initial Architecture, the decision wins.
 - **Interfaces:** what the area provides to other areas and what it consumes from them. Read neighboring areas' Interfaces before you change one.
 - **Open Questions:** unresolved items, each with an owner and what it blocks.
 - **Update it** while scoping, reviewing, deciding, and agreeing interfaces. Never delete a decision. Supersede it instead.
@@ -48,7 +51,7 @@ Every area has the same three files. Read them in this order, because each one b
 
 ## Area Owners
 
-Each area has one owner. The owner is the human who accepts decisions, approves the area, and answers its open questions.
+The owner is the human who accepts decisions, approves the area, and answers its open questions. Most areas have one owner. `build-and-operation` and `database` are owned by the whole group (see "Shared Ownership").
 
 | Area | Owner | Contributors |
 |---|---|---|
@@ -56,8 +59,16 @@ Each area has one owner. The owner is the human who accepts decisions, approves 
 | `job-discovery-and-matching` | Luke Campbell | Ryan Fusco (Matcher and bullet selection) |
 | `experience-bank` | Ryan Fusco | — |
 | `delivery` | Ryan Fusco | — |
-| `build-and-operation` | Ryan Fusco | — |
-| `database` | Ryan Fusco (pending SYS-Q02) | Graham Cohick, Luke Campbell (the item types their areas write) |
+| `build-and-operation` | Shared: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell | — |
+| `database` | Shared: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell | — |
+
+### Shared Ownership
+
+Every area runs on `build-and-operation` and stores its data through `database`, and every owner will need to make decisions in both. So the group owns them together:
+- **Any owner may edit it,** with the same rights as an owner of a single-owner area.
+- **The coordinator** (Ryan Fusco, for both areas) keeps the work moving: drafting, collecting requirements (the Requirements Intake, access patterns, and item types), and asking for acceptances. The coordinator has no extra decision power.
+- **A decision or interface is Accepted only when every owner has accepted it.** Record each one, for example `Accepted by: Ryan Fusco (2026-11-18), Graham Cohick (2026-11-18), Luke Campbell (2026-11-19)`. Until then it stays `Proposed`.
+- **Approval:** the area moves to `In Review` when the coordinator asks for it, and to `Approved` only when every owner agrees.
 
 ### Working on Someone's Behalf
 
@@ -73,13 +84,14 @@ In every case:
 
 - **Only the owner accepts.** A contributor's additions stay `Proposed` until the owner accepts them. Don't restructure or rewrite the owner's existing content.
 - **Ask other areas through Open Questions.** When you need something from an area the person doesn't own, record an Open Question in one of their own areas, with the other area's owner as its owner. Or propose an interface (see "Coordinating Across Areas").
+- **Leave a pointer in the other area.** Whatever your role, you may add a row to the "Requests From Other Areas" table in that area's `architecture.md`, linking to the question, interface, or decision that needs its owner. See "Requests From Other Areas" below.
 - **Never mark anything `Accepted` or `Approved`** on behalf of a group member unless that person tells you to in the current session.
 
 ## How to Plan an Area
 
 Work through these steps in order. Each step builds on the one before it.
 
-1. **Transcribe the architecture.** Copy the area's part of RFC 0001 into "Architecture (as given)" in `architecture.md`, without changing it. Use "Where Each Area's Material Is" below to find the right lane and pages, and cite each page. Follow the reading rules in `inputs/AGENTS.md`.
+1. **Transcribe the architecture.** Copy the area's part of RFC 0001 into "Initial Architecture" in `architecture.md`, without changing it. Use "Where Each Area's Material Is" below to find the right lane and pages, and cite each page. Follow the reading rules in `inputs/AGENTS.md`.
 2. **Set the scope.** In the Scope section of `architecture.md`, write what the area owns and what it doesn't, naming the owner of each excluded item. Check the scope against the Areas list in `planning/AGENTS.md` and against the scope of every other area. If any of them overlap, settle the overlap before you continue.
 3. **Review the architecture.** Record each finding in "Architecture Review" as finding → impact → recommendation. Use the critique checklist from `planning/AGENTS.md`, and also ask of each component:
    - Does it help a demo goal (RFC p.2, p.8) or a course requirement, or is it speculative?
@@ -119,16 +131,22 @@ Most cross-area work is interfaces. In this design, they're mostly SQS messages,
   The definition lives in the provider's `architecture.md`. A consumer lists the interface under its own Interfaces, cites the provider's definition, and does not redefine it.
 - **A new or changed interface starts as `Proposed`** in the provider's area. When the provider is someone else's area, propose it through an Open Question to that owner.
 - **An interface is agreed only when both owners have accepted it.** Record each owner's acceptance next to the interface, for example `Accepted by: Ryan Fusco (2026-11-14), Graham Cohick (2026-11-15)`.
+- **Requests from other areas are listed where the owner will see them.** Every area's `architecture.md` ends with a "Requests From Other Areas" table. When you record something another owner has to act on (an Open Question they own, an interface they consume or provide, or a decision they have to accept), add one row to *their* table:
+  - the ID
+  - the area where it's defined
+  - one line on what's needed
+
+  The request is answered at its source, never in the table. Once it's answered, delete the row. These rows are pointers, not content, so any agent may add or delete them, whatever their role in the area.
 - **`build-and-operation` touches every area.** Each area's review should list what it needs from `build-and-operation`: Lambda functions and images, queues, buckets, IAM permissions, secrets, alarms, and Terraform module placement. `build-and-operation` collects those needs in its Requirements Intake table.
 
 ### Dependencies From RFC 0001
 
 These dependencies come from the diagram and data model on RFC pp.3–5. Update this list when a decision changes them.
 
-- `web-app-and-api` owns sign-in (Cognito) and the public API. The API Lambda serves reads from every area's DynamoDB items: experience, sources, matches, and settings. Every other area identifies the user by their Cognito `sub`.
-- `experience-bank` is fed by an upload through `web-app-and-api` (presigned PUT to `uploads/`). It provides verbatim bullets, roles, and skills (`DOC#` items) to `job-discovery-and-matching`, which selects bullets, and to `delivery`, which renders them.
-- `job-discovery-and-matching` provides matches with selected bullet IDs to `delivery`, through SQS render and `MATCH#` items. It reads delivery settings that `web-app-and-api` writes.
-- `delivery` provides resume PDFs (`resume/` prefix) and emails. `web-app-and-api` serves signed links to the PDFs (`GET /matches/{postingKey}`).
+- `web-app-and-api` owns sign-in (Cognito) and the public API. The API Lambda serves sources, matches, and settings from the table, and serves the experience bank through the experience-bank package (EB-I03). It also offers the regenerate choice, "mark as applied", and per-match regenerate (DEL-Q12). Every other area identifies the user by their Cognito `sub`.
+- `experience-bank` is fed by a single `.tex` upload through `web-app-and-api` (presigned PUT to `uploads/`), and each upload replaces the bank. It provides verbatim roles, bullets, and skills (`source` and `text`), plus the term resolver, through its package (EB-I03). Users are `web-app-and-api` (list and delete), `job-discovery-and-matching` (selects bullets), and `delivery` (renders them). No other area reads its items from the table directly.
+- `job-discovery-and-matching` provides matches to `delivery` through `MATCH#` items and the SQS render message: ranked experiences, projects, and skills by category (DEL-010). It marks matches for the next digest (DEL-011), and re-ranks matches when a student regenerates (DEL-014). It reads the bank through the experience-bank package (EB-I03) and settings that `web-app-and-api` writes.
+- `delivery` fits and renders one-page resume PDFs (`resume/` prefix, kept for as long as the match exists), and sends instant emails with the PDF attached and digests with signed links. `web-app-and-api` serves signed links to the PDFs (`GET /matches/{postingKey}`).
 - `database` designs the shared DynamoDB table: its access patterns, keys, indexes, and every item type. Every area reads or writes through those definitions.
 - `build-and-operation` provisions the table as `database` designs it, plus the S3 buckets (the Terraform `data` module), CI/CD, ECR, alarms, and secrets for every area.
 
@@ -136,15 +154,43 @@ These dependencies come from the diagram and data model on RFC pp.3–5. Update 
 
 Questions that span areas or affect the whole architecture. They use the `SYS-Q` prefix.
 
-- **SYS-Q01: Who owns platform work?** The RFC (p.1) lists Graham Cohick as owning "App & platform". The current owner table gives `build-and-operation` to Ryan Fusco. We need to confirm the split, especially for the Terraform `app` module, the CloudFront signing key, and API Gateway throttling.
+- **SYS-Q01: Who owns platform work?** The RFC (p.1) lists Graham Cohick as owning "App & platform". **Proposed answer (Ryan Fusco, 2026-11-17):** the whole group owns `build-and-operation`, with Ryan Fusco as coordinator (see "Shared Ownership"). Platform choices such as the Terraform `app` module, the CloudFront signing key, and API Gateway throttling are then made there by all owners. Graham Cohick and Luke Campbell need to confirm.
   - Owner: group
   - Blocks: OPS scope, `web-app-and-api` scope
-- **SYS-Q02: Who owns the `database` area?** It holds the shared table design and every item type, so the whole group depends on it. The proposal is Ryan Fusco, with Graham Cohick and Luke Campbell as contributors for the item types their areas write.
+- **SYS-Q02: Who owns the `database` area?** It holds the shared table design and every item type, so the whole group depends on it. **Proposed answer (Ryan Fusco, 2026-11-17):** the whole group owns it, with Ryan Fusco as coordinator (see "Shared Ownership"). Graham Cohick and Luke Campbell need to confirm.
   - Owner: group
   - Blocks: accepting any DB interface
 - **SYS-Q03: Which Terraform module holds each area's resources?** The RFC (p.6) lists `data`, `ingestion`, `resumes`, `app`, and `ops`, but not which area owns each one. The proposal: `ingestion` goes to `job-discovery-and-matching`, `resumes` covers `experience-bank` and `delivery`, `app` goes to `web-app-and-api`, and `data` and `ops` go to `build-and-operation`. The Matcher could sit in either `ingestion` or `resumes`.
   - Owner: group
   - Blocks: OPS-I01
+
+## Keeping Area Diagrams Current
+
+Each area's `architecture.drawio` and `architecture.png` show that area's design **as it stands now**, in more detail than the system diagram in `revised-rfc/`. They differ from the revised RFC in two ways:
+- **They include Proposed items** (drawn with dashed borders). The revised RFC shows Accepted decisions only.
+- **They zoom into one area.** Parts owned by other areas appear as grey boxes, so the connections are visible.
+
+Rules:
+- **Update the diagram in the same change as the decision.** Whenever a decision is Proposed, Accepted, or superseded, or an interface changes, in a way that adds, removes, renames, or reconnects a component, update `architecture.drawio`. Then re-export `architecture.png`. When a Proposed item is Accepted, change its border from dashed to solid. When an item is dropped, remove it.
+- **Edit the `.drawio`, never the PNG.** Use draw.io, or edit the XML directly. Then export (see "Exporting a Diagram" below), and look at the image before you commit it.
+- **Label with IDs.** Put the decision, interface, or question ID next to each element it comes from, so readers can trace it to `architecture.md`.
+- **Keep the house style:**
+  - Solid border: initial architecture or Accepted.
+  - Dashed border: Proposed or pending.
+  - Grey: another area's part.
+  - Keep the legend at the bottom.
+- **Other areas' diagrams:** when your decision changes how another area connects to yours, add a row to that area's "Requests From Other Areas" table asking for its diagram to be updated. Don't edit a diagram in an area where the person you're working for has no role. For a shared area, any owner may update it.
+
+An area can't be set to `In Review` while its diagram doesn't match its `architecture.md`.
+
+### Exporting a Diagram
+
+If draw.io is installed, use File → Export as → PNG, or run `draw.io -x -f png -o architecture.png architecture.drawio`.
+
+Without draw.io, use the draw.io viewer in a headless browser:
+1. Write a small HTML page that embeds the `.drawio` XML in a `<div class="mxgraph" data-mxgraph="…">` and loads `https://viewer.diagrams.net/js/viewer-static.min.js`.
+2. Screenshot it with headless Edge or Chrome: `--headless=new --virtual-time-budget=15000 --window-size=<width>,<height> --screenshot=architecture.png`. Set the size a little larger than the diagram's page size.
+3. Look at the image before you commit it.
 
 ## Keeping the Revised RFC Current
 
@@ -164,4 +210,5 @@ An area is done when its owner sets it to `Approved` and it meets the Phase 1 ex
 - every interface is agreed by both of its owners
 - every System Open Question is answered
 - the revised RFC includes every Accepted decision and has no *(pending)* markers left
+- every area's diagram matches its `architecture.md`
 - the group confirms the move to Phase 2

@@ -5,7 +5,7 @@
 | Status | Revised. It reflects Accepted decisions only. |
 | Based on | `architecture/inputs/Froop_inital_architecture.pdf` (RFC 0001, last updated 2026-11-03) |
 | Repository | https://github.com/lukeacampbell/Froop |
-| Last updated | 2026-11-16 |
+| Last updated | 2026-11-17 |
 
 This is the current version of the Froop architecture proposal. It starts from the submitted RFC and applies every **Accepted** decision from `planning/architecture/<area>/architecture.md`. Text marked *(pending XX-Q00)* is still as originally submitted, because the open question that would change it isn't answered yet.
 
@@ -19,6 +19,17 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-16 | EB-004: Parser Bedrock calls count toward the hourly cost cap | Data Model |
 | 2026-11-16 | EB-012: Store each item's LaTeX source and its plain text | Data Model |
 | 2026-11-16 | EB-013: Over the cost cap, accept the upload and mark leftovers unclassified | Data Model |
+| 2026-11-17 | EB-014: Extract the resume header block verbatim | Data Model |
+| 2026-11-17 | EB-015: Support one template (Jake's Resume), listed in the shared package | Summary |
+| 2026-11-17 | DEL-004: Instant emails attach the PDF, and digests use signed links | Summary, Architecture diagram, Risks |
+| 2026-11-17 | DEL-005: Fit to one page by estimating, then rendering and pruning | Summary |
+| 2026-11-17 | DEL-006: The resume header comes from the experience bank | Data Model |
+| 2026-11-17 | DEL-007: Resumes are kept for as long as the match exists | Data Model, Architecture diagram |
+| 2026-11-17 | DEL-008: The student chooses whether a new upload regenerates resumes for existing matches | Summary |
+| 2026-11-17 | DEL-012: Education and Experience are required, and Projects and Technical Skills are optional (superseded by DEL-015) | Summary |
+| 2026-11-17 | DEL-015: Section tiers: required, likely, possible, and excluded | Summary |
+| 2026-11-17 | DEL-016: Certifications and Publications are possible, and every other section is excluded | Summary |
+| 2026-11-17 | DEL-014: Which matches regenerate after a new upload | Summary |
 
 ## Team
 
@@ -33,10 +44,12 @@ This is the current version of the Froop architecture proposal. It starts from t
 ## Summary
 
 Froop finds new internship and job postings and builds a tailored one-page resume for each match from the student's own words.
-- **Upload:** students upload their complete resume or CV as a single LaTeX (`.tex`) file. Froop splits it by section into an experience bank of verbatim bullets, roles, and skills. A new upload replaces the bank.
+- **Upload:** students upload their complete resume or CV as a single LaTeX (`.tex`) file. The Jake's Resume template is fully supported. Froop splits the file by section into an experience bank of verbatim bullets, roles, and skills, plus the resume's header. A new upload replaces the bank. The student chooses whether to regenerate resumes for existing matches whose postings are still active and that they haven't applied to. Any single match can also be regenerated from the dashboard.
 - **Discovery:** on a schedule, Froop checks a built-in catalog of GitHub internship lists and Greenhouse, Lever, and Ashby boards, plus any private pages a student adds.
-- **Tailoring:** for each match, an AI model selects and orders the student's bullets and skills without editing a word, and Froop renders a one-page LaTeX resume.
-- **Results:** students get the PDF by email, instantly or in a digest, and browse all matches in a dashboard.
+- **Tailoring:** for each match, an AI model ranks the student's bullets and skills without editing a word. Froop fits the highest-ranked ones onto a one-page LaTeX resume. Every resume has the student's header, Education, and Experience. It adds Projects and Technical Skills whenever they fit, and Awards, Certifications, or Publications if there's still room. Leadership and any other section are never included.
+- **Results:**
+  - Students get the PDF attached to an instant email, or as links in an hourly or daily digest.
+  - They browse all matches, and the resumes made for them, in a dashboard for as long as they like.
 
 ## Motivation
 
@@ -59,7 +72,12 @@ No mobile app, No AI-written resume text, No sharing user-added sources between 
 
 ![Froop architecture (revised)](architecture.png)
 
-Source: `architecture.drawio`. Revised labels: S3 `uploads/` (`.tex` only), Bank parser (LaTeX section parser), Bedrock (leftover sections · pick bullet IDs).
+Source: `architecture.drawio`. Revised labels:
+- S3 `uploads/` (`.tex` only)
+- Bank parser (LaTeX section parser)
+- Bedrock (leftover sections · pick bullet IDs)
+- S3 `resumes/` (kept with match)
+- SES (PDF email · digest links)
 
 ## AWS Services
 
@@ -99,6 +117,8 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 - **Partition key:** `USER#{cognito sub}`, `SOURCE#{id}`, `POSTING#{postingKey}`, or `COST#{hour}`
 - **Sort key:** `PROFILE`, `SETTINGS`, `DOC#...` (uploads, roles, bullets, skills), `SUB#{sourceId}`, `MATCH#{postingKey}`, or `META`
 - **Experience items:** each role, bullet, and skill stores both its exact LaTeX `source` and its plain `text`. Both come from the uploaded file without any rewording. Plain text is used for matching and the dashboard, and the source is used to build new resumes.
+- **Header block:** each upload also stores its header block (name and contact details) verbatim, and every generated resume starts with it.
+- **Matches:** matches never expire, so students can look back at them later. Postings still expire.
 - **Upload status:** an upload records its status: pending, parsed, parsed with unclassified sections (when the Bedrock cost cap was reached), or failed.
 - **postingKey:** a hash of normalized company, title, and location, so the same job from two sources gets one key. Conditional puts block duplicate postings and matches.
 - **Postings:** store title, company, location, full description, apply link, and the sources that listed them. Postings expire 30 days after last seen.
@@ -110,7 +130,7 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 ### S3
 
 - `uploads/{sub}/{docId}.tex` stores the uploaded LaTeX resume. It's uploaded with a presigned PUT, and each upload triggers the parser. Only `.tex` files are accepted.
-- `resume/{sub}/{postingKey}.pdf` stores the generated resumes. They're served through expiring CloudFront signed URLs and deleted after 30 days.
+- `resume/{sub}/{postingKey}.pdf` stores the generated resumes. They're served through expiring CloudFront signed URLs, and kept for as long as the match exists. *(pending DEL-009: versioning the key by upload)*
 - `sub` keeps users' data separate, and everything is private.
 
 ## API
@@ -192,7 +212,7 @@ Recorded video.
 
 - **Chromium in Lambda:** Claude has said it requires a large image and a lot of memory.
 - **Bedrock:** none of us have used it yet.
-- **Delivering the resume:** we're not sure of the best way to give users their per-job-personalized resumes. Email attachments are simplest but can be sent to spam, signed links need a key to manage, and dashboard links make users sign in first.
+- **Delivering the resume:** resolved by DEL-004. Instant emails attach the PDF. Digests carry signed links, so they stay small and are less likely to be marked as spam. Once a link expires, the dashboard signs a fresh one.
 
 Open questions from planning are tracked in each area's `architecture.md` and in "System Open Questions" in `planning/architecture/AGENTS.md`.
 

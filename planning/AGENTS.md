@@ -39,7 +39,8 @@ planning/
 │   │   └── AGENTS.md
 │   └── <area>/
 │       ├── AGENTS.md              # Guide to working in the area: purpose, status, files, working agreement
-│       ├── architecture.md        # Scope, architecture as given, review, decisions, interfaces, open questions
+│       ├── architecture.md        # Scope, current design diagram, initial architecture (frozen), review, decisions, interfaces, open questions
+│       ├── architecture.drawio    # Current design diagram (source), with architecture.png exported from it
 │       └── implementation-plan.md # Ordered tasks with acceptance criteria
 ├── testing/                       # Phase 3: Test Planning
 │   ├── AGENTS.md
@@ -60,7 +61,7 @@ Each folder's `AGENTS.md` holds the rules for that folder only. If one of them c
 
 - **What inputs are:** `inputs/` folders hold source material that humans provide, such as requirements, the predefined architecture, assignment specs, and traffic estimates. The root `planning/inputs/` applies to every phase. A phase's `inputs/` applies only to that phase.
 - **Agents only read inputs.** They never edit, move, or delete them. If an input looks wrong or out of date, record an Open Question.
-- **Plans cite the inputs they rely on** by path. "Architecture (as given)" is transcribed from `architecture/inputs/`.
+- **Plans cite the inputs they rely on** by path. "Initial Architecture" is transcribed from `architecture/inputs/`.
 - **Don't resolve conflicts between inputs.** When two inputs disagree, record an Open Question. Don't pick one.
 
 ### Areas
@@ -78,7 +79,7 @@ The system runs on AWS and is defined in RFC 0001 (`architecture/inputs/`).
   - The scaling and throttling configuration: Lambda concurrency, SQS settings, and API Gateway throttling.
 - `/database`: the design of the single shared DynamoDB table: its access patterns, key formats, indexes, TTL, and every item type, with the area that writes each one.
 - `/delivery`: rendering one-page LaTeX resume PDFs for each match (the Renderer Lambda), storing them in S3 `resume/`, and emailing students instantly or in a digest (the Notifier Lambda and SES).
-- `/experience-bank`: turning uploaded resumes (PDF including scanned, DOCX, TXT) into verbatim bullets, roles, and skills (S3 `uploads/`, the Bank parser Lambda, and Bedrock), and storing, listing, and deleting them.
+- `/experience-bank`: turning a student's single uploaded LaTeX resume (`.tex`) into a verbatim bank of the header, sections, entries, bullets, and skills (S3 `uploads/`, the Bank parser Lambda, and Bedrock only for leftover sections), and storing, replacing, and deleting it. Other areas use the bank through its shared package.
 - `/job-discovery-and-matching`:
   - The catalog, private sources, and subscriptions.
   - Scheduled scraping (EventBridge Scheduler, SQS, and the Scraper Lambda).
@@ -139,8 +140,11 @@ and any area-specific rules they must uphold.
 ## Scope
 What this area owns. What it explicitly does not own (and who does).
 
-## Architecture (as given)
-The predefined architecture for this area, recorded unchanged.
+## Current Design Diagram
+![<Area>: current design](architecture.png), exported from `architecture.drawio`. Shows the current design, with Proposed items dashed.
+
+## Initial Architecture
+The architecture for this area as originally submitted (RFC 0001), recorded unchanged. It's a frozen baseline: never updated when decisions change the design. The current design is in Decisions.
 
 ## Architecture Review
 Critique of the given architecture. Each item: finding → impact → recommendation.
@@ -156,6 +160,10 @@ Interfaces this area uses, cited by the provider's ID.
 
 ## Open Questions
 Unresolved items. Each one has an ID (EB-Q01), an owner (human or area), and what it blocks.
+
+## Requests From Other Areas
+Pointers to items defined in other areas that this area's owner has to act on:
+| ID | Defined in | What's needed |
 ```
 
 Interface format, used under "Provides":
@@ -233,7 +241,7 @@ Before proposing a change, writing code, or running tests:
 1. **Read this file**, then the current planning folder's `AGENTS.md`, the root `inputs/`, and the current planning folder's `inputs/`. Then read the files listed for the current phase in every area your task touches.
 2. **Read the Interfaces sections of neighboring areas.** Most mistakes happen at area boundaries.
 3. **Check Decisions and Open Questions** before suggesting something. It may already be decided or under discussion.
-4. **Treat the docs in this order of authority:** Accepted decisions > approved plans (implementation, test, load) > Architecture Review > Architecture (as given). A later Accepted decision overrides the original architecture.
+4. **Treat the docs in this order of authority:** Accepted decisions > approved plans (implementation, test, load) > Architecture Review > Initial Architecture. A later Accepted decision overrides the original architecture.
 
 If the docs don't answer what you need, don't guess and keep going. Add an Open Question and either ask the human or carry on with a stated assumption, labeled as one.
 
@@ -243,7 +251,7 @@ If the docs don't answer what you need, don't guess and keep going. Add an Open 
 - **Edit in place, keep the history.** Change plans directly, but never delete entries from Decisions or load-plan Runs. Mark an old decision `Superseded by <PREFIX>-NNN` instead.
 - **Keep changes small and scoped.** One logical change per edit. A change that affects another area updates that area's Interfaces too, in the same change.
 - **Separate fact from proposal.** Mark anything a human hasn't agreed to yet as `Proposed`. Only a human moves an item to `Accepted` or an area to `Approved`.
-- **Don't edit "Architecture (as given)"** except to fix transcription errors. Put critique in Architecture Review and changes in Decisions.
+- **Don't edit "Initial Architecture"** except to fix transcription errors. Put critique in Architecture Review and changes in Decisions.
 - **Keep the plans in sync.** Once a test plan or load plan exists, a change to a task's acceptance criteria, an interface, or the infrastructure updates the test cases or load targets it affects, in the same change.
 - **Update `Last reviewed`** whenever you substantively revise an area.
 - **Write for the next agent.** Each entry should make sense to someone with no memory of this conversation. Use specific nouns, name the files, and give the reasoning.

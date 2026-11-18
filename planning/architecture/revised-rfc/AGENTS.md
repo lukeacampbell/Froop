@@ -32,9 +32,6 @@ The rules in `planning/AGENTS.md` and `planning/architecture/AGENTS.md` apply he
 
 ## Exporting the Diagram
 
-If draw.io is installed, use File → Export as → PNG, or run `draw.io -x -f png -o architecture.png architecture.drawio`.
+Follow "Exporting a Diagram" in `planning/architecture/AGENTS.md`. For this diagram, use a window size of about `1680,1140`.
 
-Without it, use the draw.io viewer in a headless browser:
-1. Write a small HTML page that embeds the `.drawio` XML in a `<div class="mxgraph" data-mxgraph="…">` and loads `https://viewer.diagrams.net/js/viewer-static.min.js`.
-2. Screenshot it with headless Edge or Chrome: `--headless=new --virtual-time-budget=15000 --window-size=1680,1140 --screenshot=architecture.png`.
-3. Check the image before you commit it.
+This diagram shows the **whole system with Accepted decisions only**. Each area's own diagram (`<area>/architecture.png`) zooms into that area and also shows Proposed items. When an Accepted decision changes both, update both.

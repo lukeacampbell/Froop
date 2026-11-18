@@ -1,6 +1,6 @@
 # Experience Bank Architecture
 
-Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), pp.1–2, 4–6, 8, and the "Experience Bank" diagram lane. Items are `Proposed` until the owner accepts them. Accepted decisions override the as-given architecture.
+Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), pp.1–2, 4–6, 8, and the "Experience Bank" diagram lane. Items are `Proposed` until the owner accepts them. Accepted decisions override the Initial Architecture.
 
 ## Scope
 
@@ -8,7 +8,7 @@ Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), pp.1–2
 - **The upload rules:** exactly one LaTeX source file (`.tex`) per upload, holding the student's complete resume or CV, and its size limit (EB-001, EB-I01).
 - **The Bank parser:**
   - It reads the uploaded LaTeX without running it (EB-009).
-  - It finds the sections and pulls out roles, bullets, and skills without an LLM.
+  - It finds the header block and the sections, and pulls out roles, bullets, and skills without an LLM (EB-014, EB-015).
   - It sends only the sections it can't place to Bedrock (EB-003).
 - **The verbatim guarantee:** every stored role, bullet, and skill is an exact span of the uploaded file.
 - **Replacing the bank:** a successful upload replaces the student's entire bank. A failed one leaves the current bank untouched (EB-002, EB-008).
@@ -17,15 +17,26 @@ Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), pp.1–2
 - **Upload status** (pending, parsed, failed, and the reason), so the dashboard can show progress and errors.
 
 **Does not own:**
-- The upload, list, and delete endpoints (`POST /uploads`, `GET /experience`, `DELETE /uploads/{docId}`), presigned URLs, and sign-in: `web-app-and-api`. They follow EB-I01 and DB-I02.
+- The upload, list, and delete endpoints (`POST /uploads`, `GET /experience`, `DELETE /uploads/{docId}`), presigned URLs, and sign-in: `web-app-and-api`. They follow EB-I01 and use EB-I03.
 - Choosing and ordering bullets for a job: `job-discovery-and-matching` (the Matcher). Ryan Fusco contributes.
 - Rendering bullets into a resume: `delivery`.
 - How items are stored in the table: `database`.
 - The bucket, table, Lambda image, IAM role, and alarms themselves: `build-and-operation` provisions them from the Requirements Intake.
 
-## Architecture (as given)
+## Current Design Diagram
 
-From RFC 0001, transcribed without changes:
+![Experience Bank: current design](architecture.png)
+
+Source: `architecture.drawio`. The diagram shows the design **as it stands now**:
+- **Solid borders:** the initial architecture or Accepted decisions.
+- **Dashed borders:** Proposed or pending items.
+- **Grey boxes:** parts that belong to other areas.
+
+Keep it in step with this file (see "Keeping Area Diagrams Current" in `planning/architecture/AGENTS.md`).
+
+## Initial Architecture
+
+> **Frozen baseline.** This is RFC 0001 *as originally submitted* (`architecture/inputs/Froop_inital_architecture.pdf`), transcribed without changes. It is never updated when decisions change the design. The current design is in **Decisions** below, and the whole current system is in `architecture/revised-rfc/`.
 
 - **Summary (p.1):** "Students upload everything they've done (resumes, scanned PDFs, text), and splits it into an experience bank of verbatim bullets."
 - **Goal 3 (p.2):** "Upload a resume and see it split into bullets that match the original text exactly."
@@ -56,7 +67,7 @@ From RFC 0001, transcribed without changes:
 3. **LaTeX is a programming language.**
    - **Finding:** compiling an uploaded `.tex` file could read files, run shell commands (`\write18`), or loop forever.
    - **Impact:** a security problem in the parser, and again in `delivery` if user source reaches the renderer.
-   - **Recommendation:** never compile or run the uploaded file, and reject dangerous commands at upload. This became EB-009, and needs coordinating with `delivery` (EB-Q09).
+   - **Recommendation:** never compile or run the uploaded file, and reject dangerous commands at upload. This became EB-009. `delivery` handles its side in DEL-001 and DEL-002.
 4. **These decisions change the submitted RFC.**
    - **Finding:** the Summary, Demo step 1, the parser's file types, and `DELETE /uploads/{docId}` (one upload, not several) no longer match.
    - **Impact:** the demo script, the API, and the proposal text the course graded all diverge from the design.
@@ -94,12 +105,12 @@ Date: 2026-11-13
 Context: Answers EB-Q02 (how verbatim is enforced).
 Decision:
 1. The parser reads the LaTeX without running it.
-2. It finds section headings (`\section`, `\section*`, and the heading macros of supported templates, EB-Q08).
+2. It finds section headings (`\section`, `\section*`, and the heading macros of supported templates, EB-015).
 3. It maps each heading to a category (experience, education, projects, skills, and so on) using a heading dictionary, for example "Work Experience", "Professional Experience", and "Employment" all map to experience.
 4. Within each section, it pulls out roles (from subheading macros) and bullets (from `\item`) as exact source spans.
 5. Only sections whose heading isn't recognized, or whose content can't be parsed, go to Bedrock. Bedrock returns a category and the exact spans. The parser keeps a span only if it appears character for character in the source. A span that doesn't is rejected and logged.
 Alternatives:
-- LLM splitting of everything (as given). Rejected: cost, and the risk of altered text.
+- LLM splitting of everything (the initial architecture). Rejected: cost, and the risk of altered text.
 Consequences:
 - Most uploads make no Bedrock calls.
 - The heading dictionary and the list of supported template macros have to be maintained.
@@ -114,7 +125,7 @@ Alternatives:
 - A separate budget for parsing. Rejected: one cap is simpler to alarm on.
 Consequences:
 - `job-discovery-and-matching` owns the counter, so the parser needs read and write access to it, and Luke Campbell has to agree.
-- What happens when the cap is reached is open (EB-Q11).
+- What happens when the cap is reached is set by EB-013.
 
 ### EB-005: Duplicate entries are kept as separate items
 Status: Accepted (Ryan Fusco, 2026-11-13)
@@ -168,7 +179,7 @@ Decision:
 Alternatives:
 - Delete, then write. Rejected: readers could see an empty or partial bank, and a failure halfway through loses data.
 Consequences:
-- DB-I02 needs a pointer item, and every reader has to resolve it, which strengthens the case for shared code (EB-Q07).
+- DB-I02 needs a pointer item, and every reader has to resolve it, which strengthens the case for shared code (now EB-010).
 
 ### EB-009: Never compile or run uploaded LaTeX
 Status: Proposed
@@ -195,16 +206,16 @@ Alternatives:
 - Each area queries the table directly. Rejected: the pointer and schema logic would be copied across codebases.
 - A separate experience-bank service. Rejected: extra latency, cost, and deployment for no real gain at this scale.
 Consequences:
-- The repo layout has to support shared libraries (OPS-Q04).
+- The repo layout has to support shared libraries (now OPS-007).
 - DB-I02 becomes internal to this area. Other areas consume EB-I03 instead.
 - Graham Cohick and Luke Campbell have to accept EB-I03.
 
 ### EB-011: Support standard sections and a few popular templates, and send the rest to the leftover path
-Status: Accepted (Ryan Fusco, 2026-11-16)
+Status: Superseded by EB-015
 Date: 2026-11-16
 Context: Answers EB-Q08. Resume templates use different macros.
 Decision:
-- **Always supported:** `\section`/`\section*`, `itemize`/`enumerate` with `\item`, and the macros of two or three popular resume templates (for example Jake's Resume: `\resumeSubheading`, `\resumeItem`, `\resumeProjectHeading`).
+- **One supported template for now:** Jake's Resume (`\resumeSubheading`, `\resumeItem`, `\resumeProjectHeading`, `\resumeSubHeadingListStart`/`End`, `\resumeItemListStart`/`End`).
 - **Simple custom macros:** a `\newcommand` in the file's own preamble whose body is plain text with arguments is expanded during parsing, without running anything.
 - **Everything else:** content the parser still can't place goes to the leftover path (EB-003).
 Alternatives:
@@ -245,6 +256,50 @@ Consequences:
 - The Matcher ignores unclassified items until they're classified.
 - A retry mechanism is needed. It could be a scheduled pass, or a retry queued for after the cap window.
 
+### EB-014: Extract the resume header block verbatim
+Status: Accepted (Ryan Fusco, 2026-11-17)
+Date: 2026-11-17
+Context: Answers EB-Q12. `delivery` needs the student's name and contact details for every resume (DEL-006).
+Decision: The parser extracts the header block deterministically. That's the content before the first section, usually a `center` environment with the name, phone, email, and links. It's stored once per upload with `source` and `text` (EB-012) and returned by `get_bank` (EB-I03). It's not a selectable item, so the Matcher never ranks it.
+Alternatives:
+- Header fields in the user profile (`web-app-and-api`). Rejected: the uploaded resume already has them, verbatim.
+Consequences:
+- DB-I02 gains a header block item.
+- If no header is found, the upload is still parsed, and its status notes the missing header, so the student can fix the file.
+
+### EB-015: Support one template (Jake's Resume), listed in the shared package
+Status: Accepted (Ryan Fusco, 2026-11-17)
+Date: 2026-11-17
+Context: Answers EB-Q13 and DEL-Q07. Supersedes EB-011, which planned for two or three templates.
+Decision:
+- **Always supported:** `\section`/`\section*` and `itemize`/`enumerate` with `\item`.
+- **One supported template for now:** Jake's Resume (`\resumeSubheading`, `\resumeItem`, `\resumeProjectHeading`, `\resumeSubHeadingListStart`/`End`, `\resumeItemListStart`/`End`).
+- **Simple custom macros:** a `\newcommand` in the file's own preamble whose body is plain text with arguments is still expanded during parsing, without running anything.
+- **Everything else** goes to the leftover path (EB-003).
+- **Where the list lives:** the supported templates and their macros are a single list in the experience bank package (EB-I03). The parser uses it to read uploads, and `delivery` uses it to define those macros in its template (DEL-001). Adding a template means one change to that list, plus its definitions in the delivery template.
+Alternatives:
+- Two or three templates now (EB-011). Rejected for now: one template is enough to build and demo, and more can be added through the shared list.
+- Separate lists in the parser and in `delivery`. Rejected: they would drift apart.
+Consequences:
+- Students using other templates still get their standard sections and `\item` bullets, and anything else goes to the leftover path, which uses Bedrock and counts against the cost cap.
+- The demo resume uses Jake's Resume.
+
+### EB-016: Label each section by category, and keep skills grouped by their own category
+Status: Proposed
+Date: 2026-11-17
+Context: `delivery` builds resumes from section tiers (DEL-015), and the Matcher ranks projects with their bullets and skills within categories (DEL-010).
+Decision:
+- **Section categories:** every section gets one category: `education`, `experience`, `projects`, `technical_skills`, `awards`, `certifications`, `publications`, `leadership`, or `other`. The category comes from the heading dictionary (EB-003). The section's own heading text is still stored verbatim.
+- **Entries:** in Jake's Resume, `\resumeSubheading` entries under experience are roles, entries under education are education entries, and `\resumeProjectHeading` entries are projects. Each entry owns its `\resumeItem` bullets, in their original order.
+- **Skills:** each category line in the skills section (for example `\textbf{Languages}{: Java, Python, C/C++}`) becomes a skill category. Its name (`Languages`) is stored verbatim. Each comma-separated value becomes one skill item, with its own `source` and `text`.
+- **Every section is banked,** whatever its category. Which ones appear on a resume is decided by `delivery` (DEL-015).
+Alternatives:
+- Treat skills as one free-text line. Rejected: the Matcher couldn't rank individual skills within a category.
+Consequences:
+- DB-I02 gains education entries, project entries, skill categories, and a section category on each item.
+- `get_bank` (EB-I03) returns items grouped by section category, with skills grouped by skill category.
+- Splitting skills on commas has to respect braces and escaped characters. For example, `C/C++` is one skill, and so is `Node.js`.
+
 ## Interfaces
 
 ### Provides
@@ -272,27 +327,36 @@ Accepted by: —
 Status: Proposed
 Consumers: web-app-and-api (`GET /experience`, delete), job-discovery-and-matching (the Matcher), delivery (the Renderer)
 Contract: A Python package owned by this area (EB-010). It is the only supported way to use the bank:
-- `get_bank(sub)`: the current upload's status, roles, bullets, and skills, each with `source` and `text` (EB-012)
+- `get_bank(sub)`: the current upload's `docId`, status, and header block (EB-014). Then its items grouped by section category (EB-016): education entries, roles, projects (each with their bullets), skills grouped by skill category, and `other` sections. Every item has `source` and `text` (EB-012).
 - `get_items(sub, ids)`: specific items by ID. Missing IDs (replaced by a newer upload) are reported, not raised as errors.
 - `delete_bank(sub)`: deletes the bank and the uploaded file
 - `upload_status(sub)`: pending, parsed, parsed with unclassified sections (EB-013), or failed, with a reason
 - `resolve(term)`: the term resolver (EB-I02)
+- `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
 Accepted by: —
 
 ### Consumes
-- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `canonical` field on skills (EB-007), the `source` and `text` fields (EB-012), and the `unclassified` marker and new status value (EB-013).
+- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `canonical` field on skills (EB-007), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), and the section categories, entries, and skill categories (EB-016).
 - **The user's Cognito `sub`:** through the upload key (EB-I01), which `web-app-and-api` issues.
 - **Bedrock, and the hourly cost counter:** `COST#{hour}`, owned by `job-discovery-and-matching` (EB-004).
 - **The uploads bucket with event notifications, the shared table, the parser Lambda image, and its IAM role:** from `build-and-operation` (OPS-I01, OPS-I02, OPS-I03).
 
 ## Open Questions
 
-Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011), EB-Q09 (EB-012), EB-Q11 (EB-013).
+Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, since superseded by EB-015), EB-Q09 (EB-012), EB-Q11 (EB-013), EB-Q12 (EB-014), EB-Q13 (EB-015).
 
 - **EB-Q10: The API, and the shared sections of the RFC, still need updating for EB-001 and EB-002.** The revised RFC (`architecture/revised-rfc/`) now covers this area's sections: the Summary, Goal 3, Bedrock's role, the Data Model, the upload file type, and Demo step 1. Still open:
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
   - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections.
   - Owner: Graham Cohick (API), group (shared sections)
   - Blocks: EB-I01 acceptance
+
+## Requests From Other Areas
+
+Pointers to items defined in other areas that this area's owner has to act on. Answer each one where it's defined, then delete its row (see "Coordinating Across Areas" in `planning/architecture/AGENTS.md`).
+
+| ID | Defined in | What's needed |
+|---|---|---|
+| _None yet._ | | |

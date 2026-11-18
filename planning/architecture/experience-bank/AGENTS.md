@@ -14,28 +14,31 @@ The experience bank holds everything a student has done, in the student's own wo
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-16
+Last reviewed: 2026-11-17
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Architecture (as given), Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-006 and EB-010 to EB-013 are Accepted. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-006, EB-010, and EB-012 to EB-015 are Accepted. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 
 Where to look:
 
+- **What other areas need from this owner:** `architecture.md` → Requests From Other Areas
 - **What the area is responsible for:** `architecture.md` → Scope
+- **How the area fits together right now:** `architecture.md` → Current Design Diagram
 - **What other areas rely on from this area:** `architecture.md` → Interfaces → Provides
 - **What's still undecided:** `architecture.md` → Open Questions
-- **What was actually decided:** `architecture.md` → Decisions. These override the as-given text.
+- **What was actually decided:** `architecture.md` → Decisions. These override the Initial Architecture.
 - **What's being built, and in what order:** `implementation-plan.md`
 
 ## Working Agreement
 
 **Agents may, without asking:**
-- Transcribe the area's part of the RFC into "Architecture (as given)".
+- Transcribe the area's part of the RFC into "Initial Architecture".
 - Add review findings, and draft `Proposed` decisions, interfaces, and Open Questions.
 - Update `Last reviewed` after a substantive revision.
 

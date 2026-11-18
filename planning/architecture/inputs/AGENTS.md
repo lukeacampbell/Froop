@@ -2,7 +2,7 @@
 
 This folder holds source material for **Phase 1: Architecture Planning** only. That means the predefined architecture the team proposed and anything that describes it, such as diagrams or reviewer feedback. Material that applies to every phase goes in `planning/inputs/` instead.
 
-Inputs are what the architecture plans are built from. Each area's "Architecture (as given)" section is transcribed from the files here. Plans cite inputs, and inputs never cite plans.
+Inputs are what the architecture plans are built from. Each area's "Initial Architecture" section is transcribed from the files here. Plans cite inputs, and inputs never cite plans.
 
 ## Rules for Agents
 

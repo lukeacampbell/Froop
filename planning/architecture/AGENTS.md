@@ -164,6 +164,10 @@ Questions that span areas or affect the whole architecture. They use the `SYS-Q`
   - Owner: group
   - Blocks: OPS-I01
 
+- **SYS-Q04: Confirm the shared goals and demo for Greenhouse-only scope.** Luke explicitly narrowed discovery to Greenhouse on 2026-11-18 (JDM-001). Proposed group wording: Goal 1 demonstrates repeated discovery and catalog/private references to the same Greenhouse board without duplicate postings or matches; Goal 2 demonstrates catalog and user-added Greenhouse boards. Demo step 2 adds a Greenhouse board, step 3 repeats discovery of the same provider ID, and step 5 uses an invalid board token to demonstrate isolated failure. Remove JavaScript-page and cross-provider coverage promises. No rubric is present in planning/inputs; the group should confirm any course-specific implications. JDM scope is accepted; shared Summary/Goals/Demo approval remains pending.
+  - Owner: group (Ryan, Graham, Luke)
+  - Blocks: final shared RFC goal/demo signoff, not the JDM draft.
+
 ## Keeping Area Diagrams Current
 
 Each area's `architecture.drawio` and `architecture.png` show that area's design **as it stands now**, in more detail than the system diagram in `revised-rfc/`. They differ from the revised RFC in two ways:

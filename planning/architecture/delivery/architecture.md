@@ -406,4 +406,5 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| _None yet._ | | |
+| JDM-Q02, JDM-I03 | `job-discovery-and-matching/architecture.md` | Agree render request/generation deduplication, digest keys and regeneration; document SES send/record ambiguity; update diagram. |
+| DB-Q08, DB-Q09 | `database/architecture.md` | Agree bounded PDF-history storage and exact digest index keys before implementation. |

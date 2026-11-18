@@ -145,7 +145,7 @@
         <mxCell id="c38" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#db2777;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;SQS scrape&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;queue + DLQ&lt;/font&gt;" vertex="1">
           <mxGeometry height="58" width="190" x="270" y="520" as="geometry" />
         </mxCell>
-        <mxCell id="c39" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Scraper&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;Lambda · Playwright image&lt;/font&gt;" vertex="1">
+        <mxCell id="c39" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Scraper&lt;/b&gt;&lt;br&gt;HTTP JSON · JDM-001" vertex="1">
           <mxGeometry height="58" width="190" x="500" y="520" as="geometry" />
         </mxCell>
         <mxCell id="c40" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#db2777;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;SQS match&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;queue + DLQ&lt;/font&gt;" vertex="1">
@@ -160,7 +160,7 @@
         <mxCell id="c43" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Catalog dispatcher&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;Lambda · fan-out&lt;/font&gt;" vertex="1">
           <mxGeometry height="58" width="190" x="270" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="c44" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#6b7280;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Job sites&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39; color=&#39;#374151&#39;&gt;Greenhouse · Lever · Ashby · GitHub · JS&lt;/font&gt;" vertex="1">
+        <mxCell id="c44" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#6b7280;strokeWidth=1.6;fontSize=14;" value="&lt;b&gt;Greenhouse&lt;/b&gt;&lt;br&gt;Public Job Board API (JDM-001)" vertex="1">
           <mxGeometry height="58" width="260" x="500" y="640" as="geometry" />
         </mxCell>
         <mxCell id="c45" edge="1" parent="1" style="edgeStyle=none;html=1;strokeColor=#334155;strokeWidth=1.6;fontSize=11;labelBackgroundColor=#f8fafc;endArrow=block;endFill=1;" value="">

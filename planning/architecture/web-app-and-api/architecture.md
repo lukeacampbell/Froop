@@ -103,3 +103,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 | OPS-Q07 | `build-and-operation/architecture.md` | Confirm this area's row in the Requirements Intake. |
 | OPS-001 to OPS-007, OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept or challenge Ryan Fusco's answers: the state lock, the $1/user and $5/platform hourly caps, the image split, CI, the Bedrock model and region, and the repo layout. Also accept the four contracts. |
 | OPS-008 to OPS-010 | `build-and-operation/architecture.md` | As a co-owner, accept staying in the SES sandbox, the $50 monthly budget alert, and the $1.50 daily Bedrock cap. |
+| JDM-Q01, JDM-I01 | `job-discovery-and-matching/architecture.md` | Agree Greenhouse-only source input, API-owned source/subscription writes, settings filters and regeneration producer contract; update API diagram/help text. |

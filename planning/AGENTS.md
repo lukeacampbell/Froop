@@ -81,8 +81,8 @@ The system runs on AWS and is defined in RFC 0001 (`architecture/inputs/`).
 - `/delivery`: rendering one-page LaTeX resume PDFs for each match (the Renderer Lambda), storing them in S3 `resume/`, and emailing students instantly or in a digest (the Notifier Lambda and SES).
 - `/experience-bank`: turning a student's single uploaded LaTeX resume (`.tex`) into a verbatim bank of the header, sections, entries, bullets, and skills (S3 `uploads/`, the Bank parser Lambda, and Bedrock only for leftover sections), and storing, replacing, and deleting it. Other areas use the bank through its shared package.
 - `/job-discovery-and-matching`:
-  - The catalog, private sources, and subscriptions.
-  - Scheduled scraping (EventBridge Scheduler, SQS, and the Scraper Lambda).
+  - The Greenhouse board catalog, user-private Greenhouse sources, and subscriptions (JDM-001).
+  - Scheduled Greenhouse JSON discovery (EventBridge Scheduler, SQS, and the Scraper Lambda); no browser scraping (JDM-001).
   - Deduplicating postings.
   - Matching postings to users, and selecting bullets with Bedrock under a cost cap (the Matcher Lambda).
 - `/web-app-and-api`: sign-in (Cognito), the REST API (API Gateway and the API Lambda), the React dashboard (S3 and CloudFront), user profiles and settings, and signed resume links.

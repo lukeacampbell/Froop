@@ -9,21 +9,21 @@ The rules in `planning/AGENTS.md` and `planning/architecture/AGENTS.md` apply he
 
 ## Purpose
 
-_To be written by Luke Campbell._
+Find Greenhouse jobs from subscribed boards and select the student’s existing experience for a tailored resume.
 
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: —
+Last reviewed: 2026-11-18
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
-| `AGENTS.md` | This guide | Boilerplate. Purpose and ground rules to be written by the owner. |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Boilerplate. Only "Requests From Other Areas" has content. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Drawn from the initial architecture plus other areas' decisions, for the owner to refine. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
+| `AGENTS.md` | This guide | Updated for Luke’s Greenhouse-only planning request. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Scope, review, seven decisions, interfaces, and remaining agreements drafted. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Updated 2026-11-18 for Greenhouse-only scope and proposed recovery flow. |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Drafted: JDM-T01 to JDM-T10, with acceptance criteria and explicit blockers. |
 
 Where to look:
 
@@ -51,4 +51,4 @@ Where to look:
 - Proposing anything that adds cost or a new external service.
 - Moving any item to `Accepted`, or the area to `In Review` or `Approved`.
 
-**Ground rules:** _To be written by Luke Campbell._
+**Ground rules:** Greenhouse only for this version. State each decision and its reasoning. Keep work in Phase 1; preserve the submitted baseline; do not attribute agreement to other owners.

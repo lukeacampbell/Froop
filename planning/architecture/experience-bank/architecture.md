@@ -359,4 +359,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| _None yet._ | | |
+| JDM-Q02, JDM-I04 | `job-discovery-and-matching/architecture.md` | Agree shared cost reservation package and EB-I02/03 consumer usage; provide package/task IDs and update cost-flow diagram. |

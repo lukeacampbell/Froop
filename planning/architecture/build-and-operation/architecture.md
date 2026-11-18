@@ -216,6 +216,15 @@ Consequences:
 - **Deferred work:** once the daily cap is reached, parsing of leftover sections (EB-013) and Matcher work that needs Bedrock wait until the next UTC day. The Matcher's behavior is decided by `job-discovery-and-matching`.
 - **Most uploads aren't affected:** most of the parser's work needs no Bedrock (EB-003).
 
+### OPS-011: Greenhouse-only ingestion resources
+Status: Proposed (2026-11-18; all shared owners must agree)
+Date: 2026-11-18
+Context: JDM-001 removes browser scraping; JDM-003/004 use one dispatcher for polling and recovery.
+Decision: Amend OPS-003 so the scraper image is a small HTTP client without Chromium/Playwright. Keep separate function images, existing AWS services and the proposed repository/CI conventions. Place dispatcher, scraper and Matcher in `ingestion`; renderer and its queue consumer stay with delivery. A single 15-minute dispatcher tick replaces per-source schedules; hourly/daily digest schedules remain delivery resources.
+Reasoning: Removes browser dependencies and source-specific schedule management, while reusing the existing dispatcher for recoverable work.
+Alternatives: Browser image and one scheduler resource per source are unnecessary for Greenhouse-only polling.
+Consequences: OPS-003's original proposal stays in the history pending group acceptance; OPS-I05 is the current proposed JDM intake. No infrastructure is provisioned during planning. Shared decisions OPS-001 to OPS-010 are not automatically accepted by this change.
+
 ## Interfaces
 
 ### Provides
@@ -272,6 +281,18 @@ Contract:
   All alarms go to SNS, which emails the team.
 Accepted by: —
 
+#### OPS-I05: Amended JDM Requirements Intake
+Status: Proposed
+Consumers: job-discovery-and-matching, database, delivery, web-app-and-api
+Contract:
+- Dispatcher, scraper and Matcher small container-image Lambdas; no browser dependency. One dispatcher schedule every 15 minutes, source poll interval default one hour; manual cooldown five minutes. Digest schedules are separate delivery resources.
+- SQS scrape/match/render with DLQs; JDM produces render messages, delivery consumes. Start batch size 1, bounded receives 5, Lambda timeout 60 seconds for dispatcher/scraper and 120 seconds for Matcher, visibility 720 seconds; configure and validate these together. Values are implementation defaults, not load targets. Workers checkpoint before timeout; a large source cannot silently omit later jobs/subscribers.
+- Table permissions scoped by operation: API configuration writes; dispatcher source/work/checkpoint reads and conditional updates plus enqueue; scraper HTTP egress to fixed Greenhouse API, posting/work writes and match enqueue; Matcher bank-package access, matches/work/cost transactions, render enqueue and configured Bedrock model invocation. Only authorized API commands can initiate user actions. No Greenhouse secret and no Bedrock permission for scraper.
+- Config: table and queue names, poll/cooldown/lease limits, HTTP/response limits, ranking token limits/model ID/pricing version, cost caps, and work recovery page limits. No hardcoded model prices.
+- Metrics/alarms: poll failures, DLQ depth, oldest pending work, budget deferral, invalid model output and estimated/actual AI cost; retain JSON correlation IDs without resume text, job bodies or raw prompts.
+- Provision GSI3 and work/reservation schemas only after DB-I04 acceptance. Keep GSI1/GSI2; proposed LSI1 removal requires DB agreement before table deployment.
+Accepted by: —
+
 ### Consumes
 - **The table design:** DB-I01 from `database`.
 - **Requirements from every area,** collected below.
@@ -284,7 +305,7 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 |---|---|---|---|
 | web-app-and-api | Cognito user pool and hosted UI; API Gateway HTTP API with a JWT authorizer; `api` image; CloudFront and the S3 static site; read access to the signing key | RFC p.3–4, 7 | Proposed |
 | experience-bank | Uploads bucket that accepts only `.tex` (presigned PUT limited to that content type and the size limit), with event notifications to the Bank parser; parser Lambda (small: a Python LaTeX parser, with no OCR and no TeX install, EB-001, EB-009); Bedrock invoke permission; read and write on the `COST#` counter (EB-004); table access for experience items | RFC p.3, 5; EB-I01 | Proposed |
-| job-discovery-and-matching | EventBridge Scheduler (per source, catalog, digest); Catalog dispatcher Lambda; SQS scrape, match, and render queues with DLQs; `scraper` image (Chromium); Matcher Lambda; Bedrock invoke permission; catalog seed script | RFC p.3–4, 7 | Proposed |
+| job-discovery-and-matching | One dispatcher tick; HTTP-only Greenhouse scraper; Matcher; scrape/match/render queues and DLQs; durable recovery and cost reservations; seed catalog. Digest schedules stay with delivery. See OPS-I05 for permissions/configuration. | JDM-001 to JDM-007, OPS-011 | Proposed amendment; replaces RFC-derived JDM intake |
 | delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES, DEL-004); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |
 | database | One table with the keys, GSI1, GSI2, LSI1, and TTL from DB-I01 | RFC p.5; DB-I01 | Proposed |
 | experience-bank | The experience bank package (EB-I03) built into the `api` image and every image that runs the parser, Matcher, or Renderer | EB-010 | Proposed |
@@ -303,4 +324,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| _None yet._ | | |
+| JDM-Q03, OPS-I05 | `job-discovery-and-matching/architecture.md`; this file | Agree amended HTTP-only intake, dispatcher/recovery configuration and ingestion module placement. |

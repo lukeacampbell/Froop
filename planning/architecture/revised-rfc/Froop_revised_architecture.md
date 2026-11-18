@@ -5,7 +5,7 @@
 | Status | Revised. It reflects Accepted decisions only. |
 | Based on | `architecture/inputs/Froop_inital_architecture.pdf` (RFC 0001, last updated 2026-11-03) |
 | Repository | https://github.com/lukeacampbell/Froop |
-| Last updated | 2026-11-17 |
+| Last updated | 2026-11-18 |
 
 This is the current version of the Froop architecture proposal. It starts from the submitted RFC and applies every **Accepted** decision from `planning/architecture/<area>/architecture.md`. Text marked *(pending XX-Q00)* is still as originally submitted, because the open question that would change it isn't answered yet.
 
@@ -30,6 +30,7 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-17 | DEL-015: Section tiers: required, likely, possible, and excluded | Summary |
 | 2026-11-17 | DEL-016: Certifications and Publications are possible, and every other section is excluded | Summary |
 | 2026-11-17 | DEL-014: Which matches regenerate after a new upload | Summary |
+| 2026-11-18 | JDM-001: Greenhouse-only discovery | Architecture diagram, AWS Services, API source constraint, Risks, Alternatives; shared Summary/Goals/Demo marked pending SYS-Q04 |
 
 ## Team
 
@@ -41,11 +42,13 @@ This is the current version of the Froop architecture proposal. It starts from t
 
 *(pending SYS-Q01: the planning area owners are listed in `planning/architecture/AGENTS.md`.)*
 
+> **Current discovery scope:** Greenhouse only, accepted by Luke in JDM-001. The historical multi-provider/JavaScript wording in shared Summary, Goals and Demo below is pending the group update in SYS-Q04; it is not an instruction to implement those providers. Other JDM recommendations remain Proposed and are not applied here.
+
 ## Summary
 
 Froop finds new internship and job postings and builds a tailored one-page resume for each match from the student's own words.
 - **Upload:** students upload their complete resume or CV as a single LaTeX (`.tex`) file. The Jake's Resume template is fully supported. Froop splits the file by section into an experience bank of verbatim bullets, roles, and skills, plus the resume's header. A new upload replaces the bank. The student chooses whether to regenerate resumes for existing matches whose postings are still active and that they haven't applied to. Any single match can also be regenerated from the dashboard.
-- **Discovery:** on a schedule, Froop checks a built-in catalog of GitHub internship lists and Greenhouse, Lever, and Ashby boards, plus any private pages a student adds.
+- **Discovery:** on a schedule, Froop checks a built-in catalog of GitHub internship lists and Greenhouse, Lever, and Ashby boards, plus any private pages a student adds. *(Historical wording pending SYS-Q04; current scope is Greenhouse only.)*
 - **Tailoring:** for each match, an AI model ranks the student's bullets and skills without editing a word. Froop fits the highest-ranked ones onto a one-page LaTeX resume. Every resume has the student's header, Education, and Experience. It adds Projects and Technical Skills whenever they fit, and Awards, Certifications, or Publications if there's still room. Leadership and any other section are never included.
 - **Results:**
   - Students get the PDF attached to an instant email, or as links in an hourly or daily digest.
@@ -59,8 +62,8 @@ Internship postings are spread across hundreds of job boards, and tailoring a re
 
 ### Goals
 
-- **Goal 1:** Be able to run the same sources twice and get no duplicate postings, even when two sources list the same job.
-- **Goal 2:** See new postings from the catalog and from a private page we add, including one that needs JavaScript.
+- **Goal 1:** Be able to run the same sources twice and get no duplicate postings, even when two sources list the same job. *(Greenhouse demonstration wording pending SYS-Q04.)*
+- **Goal 2:** See new postings from the catalog and from a private page we add, including one that needs JavaScript. *(Historical wording pending SYS-Q04.)*
 - **Goal 3:** Upload a LaTeX resume and see it split into bullets that match the original text exactly.
 - **Goal 4:** Get a one-page PDF resume for each job match.
 
@@ -93,7 +96,7 @@ Source: `architecture.drawio`. Revised labels:
 | 8 | SQS | Queues work between the scraper, matcher, and renderer | Handles bursts and retries failures without losing work |
 | 9 | Bedrock | All LLM tasks (requirement extraction, classifying resume sections the parser can't place, resume item selection) | Managed LLM with IAM; don't need to worry about GPU/server and can call whenever work is done |
 | 10 | SES | Sends match emails and digests | Uses IAM instead of a third party email API key |
-| 11 | ECR | Stores the container images built by CI | Chromium and LaTeX are too large for Lambda's zip limit |
+| 11 | ECR | Stores the container images built by CI | LaTeX needs a container image; the Greenhouse HTTP scraper no longer needs Chromium (JDM-001) |
 | 12 | CloudWatch | Custom metrics, alarms, and a dashboard | Lambda already sends log and metrics here |
 | 13 | SNS | Send alarm emails to the team | Built in way for CloudWatch alarms to notify people |
 | 14 | Secrets Manager | Stores the CloudFront signing key | Keeps the key out of git; only the api and notifier Lambdas can read it |
@@ -134,6 +137,8 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 - `sub` keeps users' data separate, and everything is private.
 
 ## API
+
+JDM-001 constrains discovery sources to Greenhouse boards. The existing source routes below remain; Graham must agree token/URL validation and source/subscription ownership under JDM-I01. Arbitrary careers pages are no longer supported.
 
 | Method | Path | Auth Required? | Description |
 |---|---|---|---|
@@ -203,14 +208,14 @@ Each module creates its own Lambdas, queues, roles, and alarms.
 Recorded video.
 
 1. Sign up and upload a LaTeX resume. The parsed bullets match the original text word for word.
-2. Add a private careers page that needs JavaScript, then trigger a refresh. New postings from that page and from the catalog show up in the feed.
-3. Trigger the refresh again. No new postings or emails appear, and a job listed on both a Greenhouse board and the GitHub list shows up once. (Goal 1)
+2. *(Historical demo pending SYS-Q04.)* Add a private careers page that needs JavaScript, then trigger a refresh. New postings from that page and from the catalog show up in the feed.
+3. *(Historical demo pending SYS-Q04.)* Trigger the refresh again. No new postings or emails appear, and a job listed on both a Greenhouse board and the GitHub list shows up once. (Goal 1)
 4. Open the match email and its attached PDF. Every line matches a bullet in the bank, and the resume fits on one page.
-5. Point a source at a broken URL and show the alarm email while the other sources keep updating.
+5. *(Greenhouse failure demo pending SYS-Q04.)* Point a source at a broken URL and show the alarm email while the other sources keep updating.
 
 ## Risks and Open Questions
 
-- **Chromium in Lambda:** Claude has said it requires a large image and a lot of memory.
+- **Greenhouse availability (JDM-001):** public API failures or changed response shapes can interrupt discovery; browser scraping has been removed.
 - **Bedrock:** none of us have used it yet.
 - **Delivering the resume:** resolved by DEL-004. Instant emails attach the PDF. Digests carry signed links, so they stay small and are less likely to be marked as spam. Once a link expires, the dashboard signs a fresh one.
 
@@ -218,8 +223,8 @@ Open questions from planning are tracked in each area's `architecture.md` and in
 
 ## Alternatives Considered
 
-- **Fargate:** we considered it but chose Lambda, because the work is idle most of the day, and container-image Lambdas can run Chromium.
-- **An LLM scraper for every source:** Greenhouse, Lever, and Ashby have JSON APIs that are cheaper and more reliable, so we only use LLM extraction for pages users add.
+- **Fargate:** we considered it but chose Lambda, because the work is idle most of the day, and the Greenhouse adapter needs only HTTP (JDM-001).
+- **Multiple providers and LLM webpage extraction (JDM-001):** removed for this version. Greenhouse Job Board JSON supplies listings; no browser or extraction LLM is needed.
 - **Accepting PDF, DOCX, and TXT resumes (EB-001):** we chose LaTeX only. A deterministic section parser can keep the text verbatim with little or no LLM use, while other formats need OCR or LLM splitting.
 
 ## AI Usage

@@ -14,15 +14,15 @@ Build and Operation makes sure every part of Froop can be built, deployed, watch
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-17
+Last reviewed: 2026-11-18
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Requirements Intake, Open Questions | Draft. All sections are drafted. OPS-001 to OPS-010 are Proposed, waiting for every owner to accept. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Update it with every change to the design. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Requirements Intake, Open Questions | Draft. OPS-001 to OPS-011 and OPS-I05 contain shared proposals; Greenhouse-only intake updated. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-18. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 
 Where to look:

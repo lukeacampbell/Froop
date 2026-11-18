@@ -16,15 +16,15 @@ Every area depends on this design, so it's coordinated in one place rather than 
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-17
+Last reviewed: 2026-11-18
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. Initial Architecture, Scope, Item Types, Interfaces, and Open Questions are drafted. Access Patterns hasn't been written yet. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Update it with every change to the design. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. Access patterns and baseline schemas exist; DB-I04 adds proposed Greenhouse, work, reservation and index contracts. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-18. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 
 Where to look:

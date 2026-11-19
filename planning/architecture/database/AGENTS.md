@@ -16,16 +16,16 @@ Every area depends on this design, so it's coordinated in one place rather than 
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-18
+Last reviewed: 2026-11-19
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. Access patterns and baseline schemas exist; DB-I04 adds proposed Greenhouse, work, reservation and index contracts. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. DB-I05 is Accepted. DB-I01 to DB-I04 and DB-001 have Ryan Fusco's acceptance (DB-I03 also has Graham Cohick's) and wait on the other owners. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-18. Update it with every change to the design. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. DB-T01 to DB-T03. Blocked until Graham Cohick and Luke Campbell accept DB-I01 to DB-I04 and DB-001 (DB-I05 is Accepted). Every owner must agree to changes. |
 
 Where to look:
 

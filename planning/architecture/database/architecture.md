@@ -56,7 +56,16 @@ _None yet._
 
 ## Decisions
 
-_None yet._
+### DB-001: The table uses on-demand capacity
+Status: Proposed. Accepted by: Ryan Fusco (2026-11-19). Waiting for: Graham Cohick, Luke Campbell (shared area).
+Date: 2026-11-19
+Context: Answers DB-Q04. Traffic comes in bursts (scrapes, digests, uploads) and the table is idle most of the day (RFC p.3).
+Decision: The table and its three GSIs use DynamoDB on-demand capacity in every environment.
+Alternatives:
+- Provisioned capacity with auto scaling. Rejected: it needs capacity planning, and it charges for idle capacity, which the budget can't afford (OPS-009).
+Consequences:
+- There's no capacity to tune before Phase 5. Load Planning can revisit this if a load target needs it.
+- Cost scales with requests, so it's covered by the monthly budget alert (OPS-009).
 
 ## Access Patterns
 
@@ -98,7 +107,7 @@ The item types listed in RFC p.5. Every row is `Proposed`.
 | Match | `USER#{sub}` | `MATCH#{postingKey}` | job-discovery-and-matching (including the digest mark, DEL-011), plus delivery state from delivery and the applied flag from web-app-and-api (DB-Q06) | web-app-and-api, delivery | DB-Q01, DB-I03 |
 | Source | `SOURCE#{id}` | `META` | catalog seed (catalog sources), web-app-and-api (private sources), job-discovery-and-matching (polling fields only) (DB-I04, answers DB-Q03) | job-discovery-and-matching, web-app-and-api | DB-Q01 |
 | Posting | `POSTING#{postingKey}` | `META` | job-discovery-and-matching | delivery, web-app-and-api | DB-Q01 |
-| Cost counter (platform hourly and daily; per-user hourly as `USER#{sub}` / `COST#HOUR#…`, DB-I04) | `COST#HOUR#{UTC-hour}`, `COST#DAY#{UTC-date}` | `META` | job-discovery-and-matching, experience-bank (EB-004) | job-discovery-and-matching, experience-bank | DB-Q01 |
+| Cost counter (platform hourly and daily; per-user hourly as `USER#{sub}` / `COST#HOUR#…`, DB-I04) | `COST#HOUR#{UTC-hour}`, `COST#DAY#{UTC-date}` | `META` | job-discovery-and-matching, experience-bank (EB-017, through JDM-I04) | job-discovery-and-matching, experience-bank | DB-Q01 |
 | Work | USER#{sub} | WORK#{workId} | job-discovery-and-matching | JDM workers | DB-I04 |
 | Dispatcher checkpoint | SYSTEM#JDM | DISPATCH#{passType} | job-discovery-and-matching | dispatcher | DB-I04 |
 | Cost reservation | USER#{sub} | COSTRES#{attemptId} | parser/Matcher via JDM-I04 | parser/Matcher | DB-I04 |
@@ -112,20 +121,21 @@ Status: Proposed
 Consumers: all areas, build-and-operation (provisions it)
 Contract:
 - **Table:** a single table with generic key attributes `PK` and `SK`, using the formats in Item Types.
-- **GSI1:** a source's subscribers, and all catalog sources.
+- **GSI1:** four lookups (DB-I04): `CATALOG` → every catalog board (DB-AP06); `USER#{sub}#SOURCES` → a student's private boards (DB-AP19); `SOURCE#{sourceId}#SUBSCRIBERS` → who follows a board (DB-AP05); `BOARD#{boardToken}#POSTINGS` → a board's postings, for reconciliation (DB-AP20).
 - **GSI2:** matches waiting for a digest, bucketed by send window: `DIGEST#hourly#{UTC-hour}` or `DIGEST#daily#{UTC-date}`, sorted by `{sub}#{createdAt}#{postingKey}` (DEL-020).
 - **GSI3:** a user's matches by creation date: `USER#{sub}#MATCHES` / `{createdAt}#{postingKey}` (DB-I04). It replaces the RFC's LSI1, so the table has no local secondary index (DB-Q02).
+- **Capacity:** on-demand (DB-001).
 - **TTL:** postings expire 30 days after they were last seen.
 
 Every item carries an item-type attribute. A new item type needs a new row in Item Types before anything writes it.
-Accepted by: —
+Accepted by: Ryan Fusco (2026-11-19). Waiting for: Graham Cohick, Luke Campbell.
 
 #### DB-I02: Experience items
 Status: Proposed
 Written by: experience-bank
 Consumers: experience-bank only. The Matcher, the Renderer, and the API read and delete through the experience bank package (EB-I03, EB-010).
 Contract: Item types under `PK=USER#{sub}`, `SK=DOC#…`:
-- **Upload record:** `docId`, file name, status (pending, parsed, parsed with unclassified sections, failed), error reason, and upload time. Only `.tex` files are accepted (EB-001).
+- **Upload record:** `docId`, file name, status (`awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`; `expired` is reported once `expiresAt` passes with no file), error reason, upload time, `expiresAt`, and the student's `regenerate` choice (EB-019). Only `.tex` files are accepted (EB-001).
 - **Section:** its heading (`source` and `text`), its category (`education`, `experience`, `projects`, `technical_skills`, `awards`, `certifications`, `publications`, `leadership`, or `other`), and its position (EB-016, Proposed).
 - **Entry (role, education entry, or project):** a stable ID, the entry type, its section, its position, and its heading fields (for example title, organization, and dates), each with `source` and `text` (EB-012).
 - **Bullet:** a stable `bulletId`, `source`, `text`, the entry it belongs to, and its position.
@@ -136,7 +146,7 @@ Contract: Item types under `PK=USER#{sub}`, `SK=DOC#…`:
 - **Current-upload pointer:** a per-user item naming the current `docId` (EB-008, Proposed).
 
 The exact sort-key formats follow DB-I01. `source` and `text` are never modified after they're written. A new upload replaces the whole set (EB-002).
-Accepted by: —
+Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank). Waiting for: Graham Cohick, Luke Campbell.
 
 #### DB-I03: Match delivery state
 Status: Proposed
@@ -150,7 +160,7 @@ Contract: Attributes on `USER#{sub}` / `MATCH#{postingKey}`:
 - the GSI2 keys that mark a match as waiting for a digest (format above, DEL-020). The Matcher writes them when it creates the match (for hourly and daily students). The Notifier removes them after sending, or when the match was skipped or failed, and moves still-pending matches to the next window's bucket (DEL-011, DEL-020).
 
 Writes are conditional updates, so a duplicate SQS message changes nothing.
-Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell.
+Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19, writer of the delivery fields). Waiting for: Luke Campbell.
 
 #### DB-I04: Greenhouse discovery, durable work and budget records
 Status: Proposed (Luke's design recommendation, 2026-11-18; all shared owners must agree)
@@ -167,10 +177,10 @@ Contract:
 - **Reservation:** `PK=USER#{sub}, SK=COSTRES#{attemptId}`; `itemType=CostReservation`, upper bound, caller, model/pricing version, window IDs, createdAt, expiry. A single transaction conditionally creates it and increments all three counters within caps. Separate invocations require separate attempt IDs. Unknown outcome consumes reservation conservatively.
 - **Matches newest first (DB-Q02):** propose a GSI3 instead of LSI1: `GSI3PK=USER#{sub}#MATCHES`, `GSI3SK={createdAt}#{postingKey}`. Keep the stable match primary key for deduplication. Projection contains keys/basic feed fields; details come from base reads. Feed is eventually consistent; return newly created match directly where immediate visibility is required.
 - **Digest index:** preserve DB-I03 ownership, but GSI2 keys and timing are defined by DB-I03/DEL-020 and agreed by Luke under JDM-007; overall shared schema approval remains pending (DB-Q09). *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
-Accepted by: —. DB-I01/02/03 remain Proposed; this supplements rather than silently accepts them.
+Accepted by: Ryan Fusco (2026-11-19; the complexity risk in JDM-Q04 still stands). Waiting for: Graham Cohick, Luke Campbell. DB-I01, DB-I02, and DB-I03 are still Proposed; this contract supplements them rather than silently accepting them.
 
 #### DB-I05: Profile and Settings items
-Status: Proposed. Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009). Waiting for: Ryan Fusco (shared area).
+Status: Accepted (2026-11-19). Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009), Ryan Fusco (2026-11-19).
 Written by: web-app-and-api
 Consumers: delivery (the email address and delivery mode), job-discovery-and-matching (the filters and delivery mode)
 Contract:
@@ -188,7 +198,7 @@ Contract:
 - **Timestamps** are ISO 8601 in UTC.
 
 Why the default title filter: empty filters mean no restriction (JDM-005), so a new student who subscribes to a large board would otherwise trigger a ranking call for every posting on it. Whether `intern` also matches "Internship" depends on how the Matcher compares terms (WEB-Q06).
-Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009). Waiting for: Ryan Fusco.
+Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009), Ryan Fusco (2026-11-19).
 
 **Pending regeneration amendment (JDM-I05):** add workType, targetDocId, requestedAt, fanout cursor and per-match request idempotency/active-request fields to DB-I04 only after Graham/Ryan agree. API conditionally creates command records, JDM transitions them. Existing DB-I04 is not silently accepted by this proposal.
 
@@ -214,14 +224,14 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
   - **Luke’s answer (2026-11-18):** API writes user source configuration and subscriptions; catalog seed writes catalog configuration; JDM writes poll state, postings and matches. The authenticated API already owns user commands, so another writer service is unnecessary. Graham already agreed to this write split (2026-11-18); the complete DB-I04 schema remains Proposed.
   - Owner: Graham Cohick, Luke Campbell
   - Blocks: Item Types
-- **DB-Q04: Which capacity mode should the table use?** Recommendation: on-demand. Traffic comes in bursts and is idle most of the day (RFC p.3), and on-demand needs no capacity planning before Phase 5.
+- **DB-Q04: Which capacity mode should the table use?** *Answered by Ryan Fusco (2026-11-19): on-demand (DB-001), Proposed until every owner accepts.* Recommendation: on-demand. Traffic comes in bursts and is idle most of the day (RFC p.3), and on-demand needs no capacity planning before Phase 5.
   - Owner: Ryan Fusco
   - Blocks: DB-I01
 - **DB-Q05: Matches need their own copy of the posting details.** Postings expire 30 days after last seen, but matches and resumes never expire (DEL-007). A match has to stay viewable, and able to be re-ranked (DEL-014), after its posting is gone. Recommendation: when the Matcher creates a match, it copies the posting's title, company, location, apply link, and description onto the match item. That copy is never updated.
   - **Luke’s answer (2026-11-18):** Agree immutable title/company/location/apply-link/description snapshot with the DB-I04 size bound. Historical matches and regeneration must work after posting expiry.
   - Owner: Luke Campbell (writes Match items), Ryan Fusco
   - Blocks: DEL-004 emails, the dashboard's match view, DEL-008
-- **DB-Q06: Where does the "applied" flag on a match live?** Regeneration skips matches the student has applied to (DEL-014). Recommendation: an `appliedAt` attribute on the match, set and cleared by `web-app-and-api` from the dashboard. *Graham Cohick accepts the recommendation (2026-11-18): `web-app-and-api` writes `appliedAt` (DB-AP14). Waiting for: Ryan Fusco to confirm.*
+- **DB-Q06: Where does the "applied" flag on a match live?** Regeneration skips matches the student has applied to (DEL-014). Recommendation: an `appliedAt` attribute on the match, set and cleared by `web-app-and-api` from the dashboard. *Graham Cohick accepts the recommendation (2026-11-18): `web-app-and-api` writes `appliedAt` (DB-AP14). **Ryan Fusco confirms (2026-11-19).** Resolved: both owners agree.*
   - Owner: Graham Cohick, Ryan Fusco
   - Blocks: DEL-014
 
@@ -233,7 +243,7 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
   - Give each a TTL a few days out.
   - Callers update all three in one transaction, conditioned on none exceeding its cap.
   - Owner: Luke Campbell (writes the cost counters), Ryan Fusco
-  - Blocks: OPS-002, OPS-010, EB-004
+  - Blocks: OPS-002, OPS-010, EB-017
 
 ## Requests From Other Areas
 

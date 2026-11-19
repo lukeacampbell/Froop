@@ -52,7 +52,7 @@ Acceptance criteria:
 2. Repeating an attempt ID cannot charge twice or authorize a second model invocation. Every new invocation reserves separately, including model retries.
 3. UTC hour/day boundaries and counter expiry are explicit; uncertain calls remain charged and actual usage is logged separately.
 4. Denied work returns the correct latest exhausted-window reset; a call larger than an entire cap or unknown pricing returns blocked configuration.
-5. Parser and Matcher use the same package contract; parser adoption is linked to Ryan's implementation task once supplied (JDM-Q02).
+5. Parser and Matcher use the same package contract; parser adoption is EB-T06 in `experience-bank/implementation-plan.md` (JDM-Q02).
 Status: Blocked (DB/OPS shared acceptances pending; JDM-I04 provider/parser contract agreed)
 
 ### JDM-T06: Implement bank-aware structured ranking

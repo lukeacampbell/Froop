@@ -157,7 +157,7 @@ Alternatives: Colon-separated IDs, UUID-only assumptions, whole-word matching an
 Consequences: Luke accepts DB-I05 as a reader/co-owner: daily delivery, titleIncludes=[intern], empty remaining filters, 20 terms/list and 1–60 trimmed characters/term. Missing Settings means no matching work, not implicit defaults. Existing matches keep their original delivery mode. DB-I05 still needs Ryan’s acceptance. JDM-I01 remains Proposed pending Graham’s agreement to the final source contract.
 
 ### JDM-010: Route regeneration through persisted JDM work
-Status: Proposed (Luke’s concrete answer to WEB-Q03; awaiting Graham and Ryan)
+Status: Proposed (Luke’s concrete answer to WEB-Q03). Ryan Fusco agrees (2026-11-19). Awaiting Graham.
 Date: 2026-11-18
 Context: WEB-T10 needs a durable way to retain the upload choice and reach the Matcher. The parser already publishes the current bank through its package.
 Decision: Use JDM-I05 below. The API persists an upload-regeneration work record only when regenerate=true, keyed by the authenticated sub and docId, before returning the upload response. JDM’s existing dispatcher waits for that exact upload to become the successful current bank, then expands it into per-match work. The parser does not send a second regeneration event. Per-match API requests persist work before best-effort match-queue enqueue; dispatcher recovery covers a failed enqueue.
@@ -202,7 +202,7 @@ Contract:
 - Fanout selects active/unexpired/unapplied matches under JDM-007. Child work IDs derive deterministically from parent requestId and postingKey; store a continuation cursor so retries cannot lose later pages. Recheck targetDocId before each child starts; if replaced again, skip that old command. Regeneration never creates a new digest mark or email.
 - Per-match requests require an Idempotency-Key (UUID), used as requestId under the authenticated sub and postingKey. Atomically create work and claim the match’s activeRegenerationRequestId. Repeating the same key for the same match returns the same 202/requestId; another key while active returns 409; a key reused with a different target returns 409. Missing/invalid key returns 400. Ownership failure returns 404. This HTTP addition needs Graham’s agreement.
 - After commit, best-effort enqueue JDM-I02 {sub,workId}; persisted pending work is the source of truth if enqueue fails. Generation is allocated atomically when the operation is admitted; retries reuse it. Clear an active request only with a conditional requestId/generation check on terminal completion/failure. Pending render handoff must not release it prematurely.
-Accepted by: Luke Campbell (2026-11-18, JDM side). Waiting for: Graham Cohick, Ryan Fusco; shared DB/OPS contracts remain Proposed.
+Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, upload-status provider: `upload_status(sub, docId)` in EB-019). Waiting for: Graham Cohick; shared DB/OPS contracts remain Proposed.
 
 ### Consumes
 
@@ -259,6 +259,9 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| DB-001 | `database/architecture.md` | As a co-owner, accept on-demand capacity for the table (answers DB-Q04). |
+| EB-I03 (EB-019 extension) | `experience-bank/architecture.md` | Accept `upload_status(sub, docId)`, which reports a specific upload and whether it is the current bank, for JDM-I05. |
+| EB-Q10 | `experience-bank/architecture.md` | Confirm the experience-bank wording in the RFC's Summary, Goal 3, and Demo step 1 (one LaTeX resume, verbatim bullets). |
 | WEB-Q03 | `web-app-and-api/architecture.md` | Luke answered with JDM-010/I05. Await Graham/Ryan’s agreement to API idempotency and per-upload bank status; no further Luke design answer pending. |
 | DB-I01 to DB-I03 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the match delivery state. The Matcher writes the digest mark. |
 | OPS-001 to OPS-007, OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept or challenge Ryan Fusco's answers: the state lock, the hourly caps, the image split, CI, the Bedrock model and region (OPS-006 sets a separate model for each Matcher task), and the repo layout. Also accept the four contracts. |

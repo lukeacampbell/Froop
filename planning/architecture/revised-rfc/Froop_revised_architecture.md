@@ -5,7 +5,7 @@
 | Status | Revised. It reflects Accepted decisions only. |
 | Based on | `architecture/inputs/Froop_inital_architecture.pdf` (RFC 0001, last updated 2026-11-03) |
 | Repository | https://github.com/lukeacampbell/Froop |
-| Last updated | 2026-11-18 |
+| Last updated | 2026-11-19 |
 
 This is the current version of the Froop architecture proposal. It starts from the submitted RFC and applies every **Accepted** decision from `planning/architecture/<area>/architecture.md`. Text marked *(pending XX-Q00)* is still as originally submitted, because the open question that would change it isn't answered yet.
 
@@ -43,6 +43,12 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-18 | WEB-010: Cross-origin access through API Gateway CORS, and hash-based routes | Security |
 | 2026-11-18 | JDM-006/007/008; JDM-I03/I04 | Data Model: provider key, budget deferral, digest timing, bank access and render handoff |
 | 2026-11-18 | JDM-009; SYS-Q01/02/04 | Source/filter behavior; confirmed shared ownership; Greenhouse Summary, Goals and Demo |
+| 2026-11-19 | EB-008: Replace the bank by switching a "current version" pointer | Data Model |
+| 2026-11-19 | EB-009 and DEL-002: Uploaded LaTeX is never run as code | Security |
+| 2026-11-19 | EB-016: Label each section by category | Data Model |
+| 2026-11-19 | EB-018: Uploads use a presigned POST | Data Model (S3), API |
+| 2026-11-19 | EB-019: The package creates the upload record, and an unused link expires | Data Model, API |
+| 2026-11-19 | DB-I05: Profile and Settings items (accepted by every owner) | Data Model |
 
 ## Team
 
@@ -106,7 +112,7 @@ Source: `architecture.drawio`. Revised labels:
 | 6 | CloudFront | CDN for website + resumes | Time based credentials |
 | 7 | EventBridge Scheduler | Starts scrapes and digest emails on a schedule | No server running all day just to wake up a few times |
 | 8 | SQS | Queues work between the scraper, matcher, and renderer | Handles bursts and retries failures without losing work |
-| 9 | Bedrock | All LLM tasks (requirement extraction, classifying resume sections the parser can't place, resume item selection) | Managed LLM with IAM; don't need to worry about GPU/server and can call whenever work is done |
+| 9 | Bedrock | All LLM tasks (requirement extraction, classifying resume sections the parser can't place, resume item selection) *(pending JDM-005: one ranking call per posting, with no separate requirement extraction)* | Managed LLM with IAM; don't need to worry about GPU/server and can call whenever work is done |
 | 10 | SES | Sends match emails and digests | Uses IAM instead of a third party email API key |
 | 11 | ECR | Stores the container images built by CI | LaTeX needs a container image; the Greenhouse HTTP scraper no longer needs Chromium (JDM-001) |
 | 12 | CloudWatch | Custom metrics, alarms, and a dashboard | Lambda already sends log and metrics here |
@@ -131,17 +137,18 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 **Table design (single table):**
 - **Partition key:** `USER#{cognito sub}`, `SOURCE#{id}`, `POSTING#{postingKey}`, or `COST#{hour}`
 - **Sort key:** `PROFILE`, `SETTINGS`, `DOC#...` (uploads, roles, bullets, skills), `SUB#{sourceId}`, `MATCH#{postingKey}`, or `META`
-- **Profile and settings:** created the first time a signed-in student opens the dashboard (`GET /me`), with the email address from Cognito and default settings.
+- **Profile and settings:** created the first time a signed-in student opens the dashboard (`GET /me`), with the email address from Cognito and default settings: daily delivery, a title filter of `intern`, and no other filters. Each filter list holds at most 20 terms of 1 to 60 characters (DB-I05).
 - **Experience items:** each role, bullet, and skill stores both its exact LaTeX `source` and its plain `text`. Both come from the uploaded file without any rewording. Plain text is used for matching and the dashboard, and the source is used to build new resumes.
 - **Header block:** each upload also stores its header block (name and contact details) verbatim, and every generated resume starts with it.
 - **Matches:** matches never expire, so students can look back at them later. Postings still expire.
-- **Upload status:** an upload records its status: pending, parsed, parsed with unclassified sections (when the Bedrock cost cap was reached), or failed.
+- **Upload status:** an upload records its status: `awaiting_file` (link issued), `pending` (file arrived), `parsed`, `parsed_with_unclassified` (when the Bedrock cost cap was reached), or `failed`. A link that's never used reports `expired`, and a student who never uploaded reports `none` (EB-019).
+- **Replacing the bank:** a new upload's items are written under its own `docId` and become current in one pointer switch, so no reader ever sees a half-replaced bank (EB-008). Every section is labeled with a category, and skills keep their own categories (EB-016).
 - **postingKey (JDM-008):** `gh.{boardToken}.{jobPostId}`. The same Greenhouse post reached through catalog/private sources has one identity; distinct provider post IDs stay distinct. Conditional puts block duplicate postings and matches.
 - **Postings:** store title, company, location, full description, apply link, and the sources that listed them. Postings expire 30 days after last seen.
 - **Indexes:**
   - GSI1: a source's subscribers, and all catalog sources
   - GSI2: matches waiting for a digest
-  - LSI1: matches by created date
+  - LSI1: matches by created date *(pending DB-I01: every owner agrees to replace it with GSI3, a matches-by-date index (DB-Q02), but the table conventions aren't accepted as a whole yet)*
 
 ### Accepted JDM handoffs (2026-11-18)
 
@@ -153,7 +160,7 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 
 ### S3
 
-- `uploads/{sub}/{docId}.tex` stores the uploaded LaTeX resume. It's uploaded with a presigned PUT *(pending WEB-Q01: a presigned POST, so S3 enforces the size limit)*, and each upload triggers the parser. Only `.tex` files are accepted.
+- `uploads/{sub}/{docId}.tex` stores the uploaded LaTeX resume. It's uploaded with a presigned POST whose policy fixes the key, the content type, a size of up to 1 MB, and a 15-minute expiry (EB-018), and each upload triggers the parser. Only `.tex` files are accepted.
 - `resume/{sub}/{postingKey}/g{generation}.pdf` stores the generated resumes, one file per render request. A regeneration never overwrites an earlier resume, and a match's history is its folder. They're served through expiring CloudFront signed URLs, and kept for as long as the match exists.
 - `sub` keeps users' data separate, and everything is private.
 
@@ -166,8 +173,8 @@ Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers 
 | GET | /health | no | Health check |
 | GET | /me | yes | Get profile and settings. The first call creates them, with default settings. |
 | PUT | /me | yes | Replace settings (delivery mode, filters). Invalid settings are rejected. |
-| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice *(pending WEB-Q01: the link's form; pending WEB-Q03: how the choice reaches the Matcher)* |
-| GET | /experience | yes | List the experience bank, with the upload's status *(pending WEB-Q02: status before a file arrives)* |
+| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice on the upload record (EB-019) *(pending WEB-Q03: how the choice reaches the Matcher)* |
+| GET | /experience | yes | List the experience bank, with the upload's status (EB-019) |
 | DELETE | /experience | yes | Delete the experience bank and the uploaded file |
 | GET | /sources | yes | List catalog sources and the user's private sources |
 | POST | /sources | yes | Add a private Greenhouse board, by board token or board URL |
@@ -220,6 +227,7 @@ Each module creates its own Lambdas, queues, roles, and alarms.
 - **Links:** upload links only allow one file in the user's own folder, and resume links expire. Links signed for the dashboard expire after 15 minutes, and only for resumes that have finished rendering.
 - **Cross-origin access:** the API accepts browser requests only from the dashboard's own address.
 - **Logs:** the API never logs tokens, email addresses, or resume text.
+- **Uploaded LaTeX is never run as code:** the parser only reads it as text and rejects dangerous commands (EB-009). The Renderer compiles only the macros its own template defines, with shell escape off (DEL-002).
 - **IAM:** each Lambda has its own role, with only the access it needs.
 - **Secrets:** the only secret is the CloudFront signing key. It's kept in Secrets Manager, and only the api and notifier can read it. Job boards need no keys, and CI uses OIDC instead of AWS keys.
 

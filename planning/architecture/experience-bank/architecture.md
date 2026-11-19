@@ -168,7 +168,7 @@ Consequences:
 - Luke Campbell has to agree to use it for posting terms.
 
 ### EB-008: Replace the bank by switching a "current version" pointer
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-13
 Context: How to carry out EB-002 safely. A resume can produce more than 100 items, which is more than one DynamoDB transaction can write, so deleting and rewriting in place could leave a half-replaced bank.
 Decision:
@@ -182,7 +182,7 @@ Consequences:
 - DB-I02 needs a pointer item, and every reader has to resolve it, which strengthens the case for shared code (now EB-010).
 
 ### EB-009: Never compile or run uploaded LaTeX
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-13
 Context: Review item 3.
 Decision:
@@ -285,7 +285,7 @@ Consequences:
 - The demo resume uses Jake's Resume.
 
 ### EB-016: Label each section by category, and keep skills grouped by their own category
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-17
 Context: `delivery` builds resumes from section tiers (DEL-015), and the Matcher ranks projects with their bullets and skills within categories (DEL-010).
 Decision:
@@ -317,19 +317,61 @@ Consequences:
 - The parser depends on a package owned by `job-discovery-and-matching`.
 - No refunds in v1, so each reservation may count more than the call really cost.
 
+### EB-018: Uploads use a presigned POST, so S3 enforces the size limit
+Status: Accepted (Ryan Fusco, 2026-11-19)
+Date: 2026-11-19
+Context: Answers WEB-Q01 (Graham Cohick). A presigned PUT can't make S3 enforce a size range. A presigned POST policy can.
+Decision: The upload link is a **presigned POST** whose policy fixes:
+- the key, `uploads/{sub}/{docId}.tex`
+- the content type, `application/x-tex`
+- the size range, 1 byte to 1 MB
+- an expiry of 15 minutes
+
+The browser sends the file as multipart form data to the URL and fields the API returns. The experience-bank package builds the policy (EB-019), so its rules live in one place.
+Alternatives:
+- A presigned PUT (EB-I01 as first drafted). Rejected: S3 can't enforce the size limit.
+Consequences:
+- EB-I01 changes from PUT to POST.
+- The API returns `{url, fields}` in `upload` (WEB-I01).
+- The uploads bucket must allow POST from the dashboard's origin (OPS-I02).
+
+### EB-019: The package creates the upload record, and an unused link expires
+Status: Accepted (Ryan Fusco, 2026-11-19)
+Date: 2026-11-19
+Context: Answers WEB-Q02 (Graham Cohick) and the per-upload status lookup in JDM-I05 (Luke Campbell). The API issues the `docId`, but only this area may write `DOC#` items (EB-010). The dashboard must show "pending" once a file is sent, and must not show it forever if no file ever arrives.
+Decision:
+- **`create_upload(sub, regenerate=False)`** (new in EB-I03):
+  - generates the `docId`
+  - writes the upload record with status `awaiting_file`, the link's expiry time, and the student's "regenerate?" choice
+  - returns `{docId, url, fields, expiresAt}` (EB-018)
+
+  The API calls it from `POST /uploads`.
+- **When the file arrives,** the parser moves the record to `pending`, then to `parsed`, `parsed_with_unclassified`, or `failed`.
+- **When no file arrives:** after the link expires, `upload_status` reports `expired`. Nothing has to clean up.
+- **Status values**, one fixed list used by every reader: `none` (the student has never uploaded), `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`, and `expired`. A `failed` status has a reason.
+- **`upload_status(sub, docId=None)`:** with no `docId`, it reports the student's latest upload. With a `docId`, it reports that upload, and whether it is the student's current bank. The Matcher uses the second form to wait for an upload before regenerating (JDM-I05).
+- **A new upload doesn't touch the current bank** until it parses successfully (EB-002, EB-008). An `awaiting_file` or `expired` upload never replaces it.
+Alternatives:
+- The API writes the upload record. Rejected: it breaks EB-010.
+- The parser creates the record when the file arrives. Rejected: the dashboard couldn't show anything between "link issued" and "file parsed".
+Consequences:
+- **EB-I03** gains `create_upload` and the `docId` form of `upload_status`. The consumers accepted EB-I03 before these were added, so they need to accept the extension.
+- **DB-I02's upload record** gains `awaiting_file`, `expired`, `expiresAt`, and `regenerate`.
+- **The API stores the regenerate choice through this package.** Luke Campbell's dispatcher reads it through `upload_status` (JDM-I05). That's one record, not two.
+
 ## Interfaces
 
 ### Provides
 
 #### EB-I01: Upload object contract
-Status: Proposed
+Status: Proposed (revised 2026-11-19: presigned POST, EB-018)
 Consumers: web-app-and-api
 Contract:
 - **Key:** `uploads/{sub}/{docId}.tex`, where `sub` comes from the Cognito token and never from the request (RFC p.7).
-- **Upload:** one object per presigned PUT. The content type is `application/x-tex` and the maximum size is to be set (suggestion: 1 MB).
+- **Upload:** one object per **presigned POST** (EB-018). The policy fixes the key, the content type `application/x-tex`, a size of 1 byte to 1 MB, and a 15-minute expiry. `create_upload` builds it (EB-019).
 - **User identity:** the parser takes the user from the key, so the key layout is part of the security model.
 - **Replacement:** a new upload replaces the bank only once it has parsed successfully (EB-002).
-Accepted by: —
+Accepted by: Ryan Fusco (2026-11-19, provider). Waiting for: Graham Cohick (consumer), now that WEB-Q01 is answered.
 
 #### EB-I02: Term resolver
 Status: Deferred with EB-007 (2026-11-18)
@@ -341,33 +383,34 @@ Contract:
 Accepted by: —
 
 #### EB-I03: Experience bank package
-Status: Proposed
+Status: Accepted (base contract). The EB-019 extension is Proposed until the consumers accept it.
 Consumers: web-app-and-api (`GET /experience`, delete), job-discovery-and-matching (the Matcher), delivery (the Renderer)
 Contract: A Python package owned by this area (EB-010). It is the only supported way to use the bank:
 - `get_bank(sub)`: the current upload's `docId`, status, and header block (EB-014). Then its items grouped by section category (EB-016): education entries, roles, projects (each with their bullets), skills grouped by skill category, and `other` sections. Every item has `source` and `text` (EB-012).
 - `get_items(sub, ids)`: specific items by ID. Missing IDs (replaced by a newer upload) are reported, not raised as errors.
 - `delete_bank(sub)`: deletes the bank and the uploaded file
-- `upload_status(sub)`: pending, parsed, parsed with unclassified sections (EB-013), or failed, with a reason
+- `create_upload(sub, regenerate=False)`: issues a `docId`, writes the upload record (`awaiting_file`), and returns the presigned POST (EB-018, EB-019). *(extension, Proposed)*
+- `upload_status(sub, docId=None)`: `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed` (with a reason), or `expired`. With a `docId`, it reports that upload and whether it is the current bank (EB-019). *(the `docId` form and the full status list are the extension, Proposed)*
 - `resolve(term)`: the term resolver (EB-I02). Deferred with EB-007, so it isn't in v1.
 - `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
-Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Waiting for: Ryan Fusco (provider). The proposed per-upload lookup in JDM-I05 is a separate extension, not part of this acceptance.
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list are Proposed. Waiting for: Graham Cohick and Luke Campbell.
 
 ### Consumes
-- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), and the section categories, entries, and skill categories (EB-016).
+- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), the section categories, entries, and skill categories (EB-016), and the upload record's new statuses, `expiresAt`, and `regenerate` (EB-019).
 - **The user's Cognito `sub`:** through the upload key (EB-I01), which `web-app-and-api` issues.
 - **Bedrock, and the shared reservation package:** JDM-I04, owned by `job-discovery-and-matching` (EB-017). Ryan Fusco accepted it on 2026-11-18 as the consumer.
 - **The uploads bucket with event notifications, the shared table, the parser Lambda image, and its IAM role:** from `build-and-operation` (OPS-I01, OPS-I02, OPS-I03).
 
 ## Open Questions
 
-Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, since superseded by EB-015), EB-Q09 (EB-012), EB-Q11 (EB-013), EB-Q12 (EB-014), EB-Q13 (EB-015). Review of Luke Campbell's contribution (2026-11-18): C5 → EB-017, C6 → EB-007 deferred.
+Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, since superseded by EB-015), EB-Q09 (EB-012), EB-Q11 (EB-013), EB-Q12 (EB-014), EB-Q13 (EB-015). Review of Luke Campbell's contribution (2026-11-18): C5 → EB-017, C6 → EB-007 deferred. Review of Graham Cohick's contribution (2026-11-19): WEB-Q01 → EB-018, WEB-Q02 and the JDM-I05 status lookup → EB-019.
 
 - **EB-Q10: The API, and the shared sections of the RFC, still need updating for EB-001 and EB-002.** The revised RFC (`architecture/revised-rfc/`) now covers this area's sections: the Summary, Goal 3, Bedrock's role, the Data Model, the upload file type, and Demo step 1. Still open:
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
     - *Answered by Graham Cohick (2026-11-18): it becomes `DELETE /experience` (WEB-001, Accepted). The revised RFC is updated.*
-  - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections.
+  - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections. *Ryan Fusco asked Graham Cohick and Luke Campbell to confirm (2026-11-19), through their Requests From Other Areas tables.*
   - Owner: Graham Cohick (API), group (shared sections)
   - Blocks: EB-I01 acceptance
 
@@ -377,9 +420,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| WEB-Q07 | `web-app-and-api/architecture.md` | Once the implementation plans for `experience-bank`, `database`, and `build-and-operation` exist, give the task IDs that WEB-T02 to WEB-T08 and WEB-T16 depend on. |
-| WEB-Q01 | `web-app-and-api/architecture.md` | Agree to change EB-I01 from a presigned PUT to a presigned POST, so S3 enforces the size limit. |
-| WEB-Q02 | `web-app-and-api/architecture.md` | Say which area creates the upload record, and what an unused upload link leaves behind. |
-| WEB-Q03 | `web-app-and-api/architecture.md` | With Luke Campbell: agree where the "regenerate?" choice is stored and which area starts regeneration after a successful parse. |
-| JDM-T05 | `job-discovery-and-matching/implementation-plan.md` | Once this area's implementation plan exists, give the task ID for adopting JDM-I04 in the parser. JDM-T05 links to it. |
-| JDM-I05 | `job-discovery-and-matching/architecture.md` | Agree per-upload status lookup keyed by sub/docId through EB-I03 so JDM can wait for the selected successful bank, detect failure/supersession, and start regeneration without a parser callback. |
+| _None yet._ | | |

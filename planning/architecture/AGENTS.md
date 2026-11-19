@@ -11,6 +11,7 @@ architecture/
 ├── AGENTS.md                      # This file
 ├── inputs/                        # RFC 0001 and its diagram (read-only); see inputs/AGENTS.md
 ├── revised-rfc/                   # The current RFC, with every Accepted decision applied; see revised-rfc/AGENTS.md
+├── questions/                     # Questions asked outside the docs (e.g. to the instructor), answers, and meeting notes; append-only, see questions/AGENTS.md
 └── <area>/
     ├── AGENTS.md                  # How to work in this area (guide, not content)
     ├── architecture.md            # What the area is, what was first proposed, what we decided, its boundaries
@@ -144,7 +145,7 @@ Most cross-area work is interfaces. In this design, they're mostly SQS messages,
 These dependencies come from the diagram and data model on RFC pp.3–5. Update this list when a decision changes them.
 
 - `web-app-and-api` owns sign-in (Cognito) and the public API. The API Lambda serves sources, matches, and settings from the table, and serves the experience bank through the experience-bank package (EB-I03). It also offers the regenerate choice, "mark as applied", and per-match regenerate (DEL-Q12). Every other area identifies the user by their Cognito `sub`.
-- `experience-bank` is fed by a single `.tex` upload through `web-app-and-api` (presigned PUT to `uploads/`), and each upload replaces the bank. It provides verbatim roles, bullets, and skills (`source` and `text`), plus the term resolver, through its package (EB-I03). Users are `web-app-and-api` (list and delete), `job-discovery-and-matching` (selects bullets), and `delivery` (renders them). No other area reads its items from the table directly.
+- `experience-bank` is fed by a single `.tex` upload through `web-app-and-api` (presigned POST to `uploads/`, EB-018), and each upload replaces the bank. It provides verbatim roles, bullets, and skills (`source` and `text`), plus the term resolver, through its package (EB-I03). Users are `web-app-and-api` (list and delete), `job-discovery-and-matching` (selects bullets), and `delivery` (renders them). No other area reads its items from the table directly.
 - `job-discovery-and-matching` provides matches to `delivery` through `MATCH#` items and the SQS render message: ranked experiences, projects, and skills by category (DEL-010). It marks matches for the next digest (DEL-011), and re-ranks matches when a student regenerates (DEL-014). It reads the bank through the experience-bank package (EB-I03) and settings that `web-app-and-api` writes.
 - `delivery` fits and renders one-page resume PDFs (`resume/` prefix, kept for as long as the match exists), and sends instant emails with the PDF attached and digests with signed links. `web-app-and-api` serves signed links to the PDFs (`GET /matches/{postingKey}`).
 - `database` designs the shared DynamoDB table: its access patterns, keys, indexes, and every item type. Every area reads or writes through those definitions.
@@ -162,7 +163,7 @@ Questions that span areas or affect the whole architecture. They use the `SYS-Q`
   - **Luke’s answer (2026-11-18):** Confirm shared database ownership, Ryan coordinating. Shared keys and indexes require agreement from their writers/readers.
   - Owner: group
   - Blocks: accepting any DB interface
-- **SYS-Q03: Which Terraform module holds each area's resources?** The RFC (p.6) lists `data`, `ingestion`, `resumes`, `app`, and `ops`, but not which area owns each one. The proposal: `ingestion` goes to `job-discovery-and-matching`, `resumes` covers `experience-bank` and `delivery`, `app` goes to `web-app-and-api`, and `data` and `ops` go to `build-and-operation`. The Matcher could sit in either `ingestion` or `resumes`. **Proposed answer in OPS-011 (Luke Campbell, 2026-11-18):** `ingestion` holds the dispatcher, scraper, and Matcher. `resumes` holds the parser and delivery (Renderer, Notifier, digest schedules, DEL-019). `data`, `app`, and `ops` stay as above. **Graham Cohick agrees (2026-11-18),** including `app` for `web-app-and-api`. Waiting for: Ryan Fusco.
+- **SYS-Q03: Which Terraform module holds each area's resources?** The RFC (p.6) lists `data`, `ingestion`, `resumes`, `app`, and `ops`, but not which area owns each one. The proposal: `ingestion` goes to `job-discovery-and-matching`, `resumes` covers `experience-bank` and `delivery`, `app` goes to `web-app-and-api`, and `data` and `ops` go to `build-and-operation`. The Matcher could sit in either `ingestion` or `resumes`. **Proposed answer in OPS-011 (Luke Campbell, 2026-11-18):** `ingestion` holds the dispatcher, scraper, and Matcher. `resumes` holds the parser and delivery (Renderer, Notifier, digest schedules, DEL-019). `data`, `app`, and `ops` stay as above. **Graham Cohick agrees (2026-11-18),** including `app` for `web-app-and-api`. **Ryan Fusco agrees (2026-11-19).** Resolved: all three owners agree (OPS-011, Accepted).
   - **Luke’s answer (2026-11-18):** Confirm ingestion contains dispatcher, scraper and Matcher; resumes contains parser, Renderer, Notifier and digest schedules. Keep each workflow with its owner. Remaining group acceptance is separate.
   - Owner: group
   - Blocks: OPS-I01
@@ -171,7 +172,7 @@ Questions that span areas or affect the whole architecture. They use the `SYS-Q`
   - Owner: group (Ryan, Graham, Luke)
   - Blocks: final shared RFC goal/demo signoff, not the JDM draft.
 
-- **SYS-Q05: Add "no account deletion" to the RFC's Non-Goals?** A student can delete their experience bank, but nothing deletes their account, matches, or resume PDFs. **Proposed answer (Graham Cohick, 2026-11-18, WEB-012):** list account deletion as a non-goal for this version, and delete a student's data by hand on request. Waiting for: Ryan Fusco, Luke Campbell.
+- **SYS-Q05: Add "no account deletion" to the RFC's Non-Goals?** A student can delete their experience bank, but nothing deletes their account, matches, or resume PDFs. **Proposed answer (Graham Cohick, 2026-11-18, WEB-012):** list account deletion as a non-goal for this version, and delete a student's data by hand on request. **Ryan Fusco agrees (2026-11-19).** Waiting for: Luke Campbell.
   - Owner: group
   - Blocks: WEB-012, and the Non-Goals section of the revised RFC
 

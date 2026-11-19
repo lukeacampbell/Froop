@@ -400,7 +400,7 @@ Consequences:
 - The first request after an idle period is slow. The cold start is measured in Phase 5, and this decision is revisited if it misses a load target.
 
 ### WEB-012: Account deletion is a non-goal for this version
-Status: Proposed. Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell, because Non-Goals is a shared section of the RFC (SYS-Q05).
+Status: Proposed. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Waiting for: Luke Campbell, because Non-Goals is a shared section of the RFC (SYS-Q05).
 Date: 2026-11-18
 Context: Review item 16. Answers WEB-Q05. A student can delete their bank but not their account, matches, or resume PDFs.
 Decision: This version has no account deletion. On request, the team deletes a student's data by hand: the Cognito user, the items under `USER#{sub}`, their private sources, and their objects under `uploads/` and `resume/`.
@@ -473,13 +473,16 @@ Used, but not accepted yet:
 ## Open Questions
 
 - **WEB-Q01: Can the upload be a presigned POST instead of a presigned PUT?** EB-I01 says "one object per presigned PUT" with a maximum size, but S3 enforces a size range only on a presigned POST (review item 4). Proposed: change EB-I01 to a presigned POST whose policy fixes the key, the content type, and the size range.
+  - *Answered by Ryan Fusco (2026-11-19): yes, a presigned POST (EB-018). The policy fixes the key, `application/x-tex`, 1 byte to 1 MB, and a 15-minute expiry. EB-I01 is revised and accepted on the provider side.*
   - Owner: Ryan Fusco (EB-I01)
   - Blocks: accepting EB-I01, the upload endpoint in WEB-I01
 - **WEB-Q02: Which area creates the upload record, and what does an unused upload link leave behind?** The dashboard needs to show "pending" as soon as a file is sent, and must not show it forever if the student never sends one (review item 3). DB-I02 lists the upload record as written by `experience-bank`, but the API issues the `docId`.
+  - *Answered by Ryan Fusco (2026-11-19): the experience-bank package creates the record (EB-019). `POST /uploads` calls `create_upload(sub, regenerate)`, which writes an `awaiting_file` record and returns the POST. An unused link leaves a record that reports `expired` after 15 minutes. The fixed status list is `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`, `expired`. EB-I03's extension needs this area's acceptance.*
   - Owner: Ryan Fusco
   - Blocks: the upload-status part of WEB-I01
 - **WEB-Q03: Where is the "regenerate?" choice stored, and which area starts regeneration once the new bank is current?** The API receives the choice before the file is uploaded, and regeneration must wait for a successful parse (review item 2, JDM-Q01, DEL-008). Proposed: the API stores the choice with the `docId` at `POST /uploads`, and `job-discovery-and-matching` holds the work until that `docId` is the current bank. The same answer should cover how the per-match regenerate request reaches the Matcher, and its request ID.
   - **Luke’s answer (2026-11-18):** Concrete proposal: JDM-010/I05. API persists upload opt-in/per-match commands; existing JDM dispatcher waits for the exact successful current docId and fans out. Same request key is idempotent; concurrent different key returns 409. Await Graham/Ryan agreement to the defined API and status contracts.
+  - *Ryan Fusco agrees with JDM-010 and JDM-I05 (2026-11-19). The regenerate choice is stored on the upload record by `create_upload` (EB-019), and Luke Campbell's dispatcher reads it through `upload_status(sub, docId)`. Waiting for: Graham Cohick, on the API side (including the `Idempotency-Key` header).*
   - Owner: Luke Campbell, Ryan Fusco
   - Blocks: answering JDM-Q01 and DEL-Q12, the regenerate endpoints in WEB-I01
 - **WEB-Q04: Can source IDs use a URL-safe separator?** `private:{sub}:gh:{boardToken}` and `gh:{boardToken}` (JDM-002) appear in `/sources/{sourceId}` and `/subscriptions/{sourceId}`. DEL-Q15 raises the same problem for `postingKey` (review item 8).
@@ -491,6 +494,13 @@ Used, but not accepted yet:
   - Owner: Luke Campbell (JDM-005)
   - Blocks: the default in DB-I05
 - **WEB-Q07: Which tasks in other areas do this area's tasks depend on?** `implementation-plan.md` needs, but can't yet cite: the bootstrap, the table and buckets, the signing-key secret, and the CI workflows (`build-and-operation`); the table design (`database`); and the bank package (`experience-bank`). None of those areas has an implementation plan yet, so the tasks cite interfaces instead (OPS-I01 to OPS-I03, DB-I01, EB-I03).
+  - *Answered by Ryan Fusco (2026-11-19). The task IDs each WEB task can now cite:*
+    - *WEB-T02: OPS-T02 (bootstrap), OPS-T03 (modules and environments)*
+    - *WEB-T03: OPS-T05 (images), OPS-T07 (IAM and the signing-key secret)*
+    - *WEB-T04: OPS-T04 (buckets), OPS-T07 (signing key)*
+    - *WEB-T05, WEB-T07, WEB-T08, WEB-T09: DB-T01 (the table), DB-T02 (key builders)*
+    - *WEB-T06: EB-T02 (`create_upload` and the presigned POST), EB-T01 (the package), OPS-T04 (the uploads bucket)*
+    - *WEB-T16: OPS-T06 (CI)*
   - Owner: Ryan Fusco (coordinator of both shared areas, and owner of `experience-bank`)
   - Blocks: the "Depends on" lines of WEB-T02 to WEB-T08 and WEB-T16
 - **WEB-Q05: Is account deletion in this version?** *Answered by Graham Cohick (2026-11-18): no (WEB-012). The group still has to agree, because Non-Goals is a shared section of the RFC (SYS-Q05).*
@@ -503,6 +513,10 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| DB-001 | `database/architecture.md` | As a co-owner, accept on-demand capacity for the table (answers DB-Q04). |
+| EB-I03 (EB-019 extension) | `experience-bank/architecture.md` | Accept `create_upload` and `upload_status(sub, docId)`, and the fixed status list, which answer WEB-Q01 and WEB-Q02. |
+| EB-I01 | `experience-bank/architecture.md` | Accept the revised upload contract (presigned POST, EB-018) as its consumer. |
+| EB-Q10 | `experience-bank/architecture.md` | Confirm the experience-bank wording in the RFC's Summary, Goal 3, and Demo step 1 (one LaTeX resume, verbatim bullets). |
 | EB-I01 | `experience-bank/architecture.md` | Accept the upload contract as its consumer: the key layout, `.tex` only, and the size limit. |
 | DEL-Q12 | `delivery/architecture.md` | The three endpoints are decided (WEB-001). Still needed: how the regenerate choice and request reach the Matcher (WEB-Q03). |
 | DB-I01, DB-I02, DB-I04 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the discovery, work, and cost records. Held until the open database questions settle. |

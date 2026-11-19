@@ -93,7 +93,7 @@ Keep it in step with this file (see "Keeping Area Diagrams Current" in `planning
 ## Decisions
 
 ### DEL-001: One Froop resume template that defines every supported template's macros
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-16
 Context: Review item 1, and EB-012 and EB-015.
 Decision: The Renderer uses a single Froop template, owned by this area. It defines the layout and every macro in the supported-template list from the experience bank package (EB-015). For now, that's Jake's Resume's macros. The student's own preamble is never used.
@@ -104,7 +104,7 @@ Consequences:
 - All generated resumes share one look.
 
 ### DEL-002: Compile only allowed macros, with hardened settings
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-16
 Context: Review item 1, and EB-009.
 Decision:
@@ -117,7 +117,7 @@ Consequences:
 - The Renderer image needs a TeX distribution with only the packages the template uses.
 
 ### DEL-003: Skip rendering when the bank has been replaced
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-16
 Context: Review item 2, and EB-002.
 Decision: Every render message carries the `docId` of the upload its items came from, plus its `generation` (DEL-010, DEL-017). If the `docId` is no longer the student's current upload, the generation is older than the match's current one, or `get_items` (EB-I03) reports missing IDs, the Renderer:
@@ -290,7 +290,7 @@ Consequences:
 - `experience-bank` has to label each section as one of education, experience, projects, technical skills, or other (EB-016).
 
 ### DEL-013: Fill and prune by score, with no fixed number of bullets per entry
-Status: Proposed
+Status: Accepted (Ryan Fusco, 2026-11-19)
 Date: 2026-11-17 (revised 2026-11-17: there's no fixed bullet count; scores decide)
 Context: How DEL-005's estimate applies to the ranking in DEL-010 and the section tiers in DEL-015. How many bullets an entry gets depends on the posting. A role might need one bullet for one posting and three for another, because its third bullet matters for that job.
 Decision:
@@ -439,14 +439,14 @@ Consequences:
 ### Provides
 
 #### DEL-I01: Resume PDF objects
-Status: Proposed
+Status: Accepted
 Consumers: web-app-and-api (signs dashboard links)
 Contract:
 - **Key and access:** `resume/{sub}/{postingKey}/g{generation}.pdf` (DEL-009), private, and served only through CloudFront signed URLs.
 - **History:** every file under `resume/{sub}/{postingKey}/` is a resume for that match. The newest generation is current.
 - **Lifetime:** never deleted while the match exists (DEL-007).
 - **Missing PDF:** an object may not exist yet (still rendering) or may have been skipped (DEL-003). The match's `renderStatus` (DB-I03) says which.
-Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api). Waiting for: Ryan Fusco (provider).
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Ryan Fusco (2026-11-19, provider).
 
 ### Consumes
 - **The SQS render message:** JDM-I03 from `job-discovery-and-matching`. Ryan Fusco accepted it on 2026-11-18 as the consumer. It covers DEL-010 and DEL-017.
@@ -491,4 +491,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| DB-I05 | `database/architecture.md` | As a co-owner and reader, accept the Profile and Settings items: the email address and the delivery mode (default: daily). |
+| _None yet._ | | |

@@ -179,10 +179,10 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
 - **DB-Q01: What attributes do the remaining item types have?** That's Profile, Settings, Subscription, Match (apart from the delivery state), Source, Posting, and Cost counter. The owner of the area that writes each type needs to propose them.
   - Owner: Graham Cohick (Profile, Settings), Luke Campbell (Subscription, Match, Source, Posting, Cost counter)
   - Blocks: DB-I01 acceptance, delivery's use of postings and settings
-- **DB-Q02: LSI1 has to be decided before the first deploy.** *Proposed answer: GSI3 (DB-I04). Luke Campbell proposed it and Ryan Fusco agrees (2026-11-18). Waiting for: Graham Cohick.* A local secondary index can only be created along with the table. It also limits each user's partition to 10 GB, and every user's data lives in one partition. The alternatives are a GSI, or sorting matches by an `SK` that includes the date.
+- **DB-Q02: LSI1 has to be decided before the first deploy.** *Proposed answer: GSI3 (DB-I04). Luke Campbell proposed it and Ryan Fusco agrees (2026-11-18). Graham Cohick agrees (2026-11-18), so every owner agrees: the table has GSI3 and no local secondary index. DB-I01 and DB-I04, which define GSI3, stay Proposed until every owner accepts them as a whole.* A local secondary index can only be created along with the table. It also limits each user's partition to 10 GB, and every user's data lives in one partition. The alternatives are a GSI, or sorting matches by an `SK` that includes the date.
   - Owner: Ryan Fusco, Luke Campbell
   - Blocks: DB-I01, the first deploy of the `data` module
-- **DB-Q03: Who writes Subscription items, and Source items for private pages?** They're created through the API (`POST /subscriptions`, `POST /sources`), but `job-discovery-and-matching` owns the concept.
+- **DB-Q03: Who writes Subscription items, and Source items for private pages?** They're created through the API (`POST /subscriptions`, `POST /sources`), but `job-discovery-and-matching` owns the concept. *Proposed answer (Luke Campbell, DB-I04): `web-app-and-api` writes Subscription items and the configuration of private Source items, and `job-discovery-and-matching` updates only a source's polling fields. Graham Cohick agrees (2026-11-18). The attribute definitions in DB-I04 stay Proposed until every owner accepts them.*
   - Owner: Graham Cohick, Luke Campbell
   - Blocks: Item Types
 - **DB-Q04: Which capacity mode should the table use?** Recommendation: on-demand. Traffic comes in bursts and is idle most of the day (RFC p.3), and on-demand needs no capacity planning before Phase 5.
@@ -191,7 +191,7 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
 - **DB-Q05: Matches need their own copy of the posting details.** Postings expire 30 days after last seen, but matches and resumes never expire (DEL-007). A match has to stay viewable, and able to be re-ranked (DEL-014), after its posting is gone. Recommendation: when the Matcher creates a match, it copies the posting's title, company, location, apply link, and description onto the match item. That copy is never updated.
   - Owner: Luke Campbell (writes Match items), Ryan Fusco
   - Blocks: DEL-004 emails, the dashboard's match view, DEL-008
-- **DB-Q06: Where does the "applied" flag on a match live?** Regeneration skips matches the student has applied to (DEL-014). Recommendation: an `appliedAt` attribute on the match, set and cleared by `web-app-and-api` from the dashboard.
+- **DB-Q06: Where does the "applied" flag on a match live?** Regeneration skips matches the student has applied to (DEL-014). Recommendation: an `appliedAt` attribute on the match, set and cleared by `web-app-and-api` from the dashboard. *Graham Cohick accepts the recommendation (2026-11-18): `web-app-and-api` writes `appliedAt` (DB-AP14). Waiting for: Ryan Fusco to confirm.*
   - Owner: Graham Cohick, Ryan Fusco
   - Blocks: DEL-014
 

@@ -14,15 +14,15 @@ _To be written by Graham Cohick._
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: —
+Last reviewed: 2026-11-18
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Boilerplate. Purpose and ground rules to be written by the owner. |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Boilerplate. Only "Requests From Other Areas" has content. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Drawn from the initial architecture plus other areas' decisions, for the owner to refine. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-012, and Open Questions WEB-Q01 to WEB-Q05 have content. Interfaces are empty. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Out of date since 2026-11-18. Drawn on 2026-11-17 from the initial architecture plus other areas' decisions. It doesn't yet carry the IDs of WEB-001 to WEB-011, and its "Waiting on this owner" note still lists EB-Q10 and DB-Q06, which are answered. No component changed. Update and re-export it before the area goes to `In Review`. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 
 Where to look:

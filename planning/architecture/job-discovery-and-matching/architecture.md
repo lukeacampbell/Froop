@@ -213,6 +213,8 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| WEB-Q03 | `web-app-and-api/architecture.md` | With Ryan Fusco: agree where the "regenerate?" choice is stored, which area starts regeneration after a successful parse, and how the per-match regenerate request reaches the Matcher. Feeds JDM-Q01. |
+| WEB-Q04 | `web-app-and-api/architecture.md` | Use a URL-safe separator in source IDs (JDM-002), as DEL-Q15 asks for `postingKey`. |
 | SYS-Q01 | `architecture/AGENTS.md` | Confirm shared ownership of `build-and-operation`, with Ryan Fusco coordinating. |
 | SYS-Q02 | `architecture/AGENTS.md` | Confirm shared ownership of `database`, with Ryan Fusco coordinating. |
 | SYS-Q03 | `architecture/AGENTS.md` | Group: confirm which Terraform module holds each area's resources, including whether the Matcher sits in `ingestion` or `resumes`. |

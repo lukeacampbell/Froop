@@ -32,6 +32,15 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-17 | DEL-014: Which matches regenerate after a new upload | Summary |
 | 2026-11-18 | DEL-009: Version resume PDFs by generation | Data Model |
 | 2026-11-18 | JDM-001: Greenhouse-only discovery | Architecture diagram, AWS Services, API source constraint, Risks, Alternatives; shared Summary/Goals/Demo marked pending SYS-Q04 |
+| 2026-11-18 | WEB-001: The revised endpoint list | API |
+| 2026-11-18 | WEB-002: Sign in with the authorization code flow and PKCE, and send the access token | Security |
+| 2026-11-18 | WEB-003: Create Profile and Settings on the first `GET /me` | Data Model, API |
+| 2026-11-18 | WEB-004: Self sign-up is a setting for each environment, off by default | Security |
+| 2026-11-18 | WEB-005: API security rules | Security |
+| 2026-11-18 | WEB-006: The matches feed is paginated | API |
+| 2026-11-18 | WEB-007: Dashboard resume links are signed on request and expire after 15 minutes | API, Security |
+| 2026-11-18 | WEB-008: Settings are validated, and `PUT /me` replaces them whole | API |
+| 2026-11-18 | WEB-010: Cross-origin access through API Gateway CORS, and hash-based routes | Security |
 
 ## Team
 
@@ -120,6 +129,7 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 **Table design (single table):**
 - **Partition key:** `USER#{cognito sub}`, `SOURCE#{id}`, `POSTING#{postingKey}`, or `COST#{hour}`
 - **Sort key:** `PROFILE`, `SETTINGS`, `DOC#...` (uploads, roles, bullets, skills), `SUB#{sourceId}`, `MATCH#{postingKey}`, or `META`
+- **Profile and settings:** created the first time a signed-in student opens the dashboard (`GET /me`), with the email address from Cognito and default settings.
 - **Experience items:** each role, bullet, and skill stores both its exact LaTeX `source` and its plain `text`. Both come from the uploaded file without any rewording. Plain text is used for matching and the dashboard, and the source is used to build new resumes.
 - **Header block:** each upload also stores its header block (name and contact details) verbatim, and every generated resume starts with it.
 - **Matches:** matches never expire, so students can look back at them later. Postings still expire.
@@ -133,7 +143,7 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 
 ### S3
 
-- `uploads/{sub}/{docId}.tex` stores the uploaded LaTeX resume. It's uploaded with a presigned PUT, and each upload triggers the parser. Only `.tex` files are accepted.
+- `uploads/{sub}/{docId}.tex` stores the uploaded LaTeX resume. It's uploaded with a presigned PUT *(pending WEB-Q01: a presigned POST, so S3 enforces the size limit)*, and each upload triggers the parser. Only `.tex` files are accepted.
 - `resume/{sub}/{postingKey}/g{generation}.pdf` stores the generated resumes, one file per render request. A regeneration never overwrites an earlier resume, and a match's history is its folder. They're served through expiring CloudFront signed URLs, and kept for as long as the match exists.
 - `sub` keeps users' data separate, and everything is private.
 
@@ -144,23 +154,26 @@ Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers 
 | Method | Path | Auth Required? | Description |
 |---|---|---|---|
 | GET | /health | no | Health check |
-| GET | /me | yes | Get profile and settings |
-| PUT | /me | yes | Update settings (delivery mode, filters) |
-| POST | /uploads | yes | Get a presigned URL to upload one LaTeX (`.tex`) file |
-| DELETE | /uploads/{docId} | yes | Delete an upload and its bullets *(pending EB-Q10: with one upload per user, this becomes "delete my experience bank")* |
-| GET | /experience | yes | List the experience bank |
+| GET | /me | yes | Get profile and settings. The first call creates them, with default settings. |
+| PUT | /me | yes | Replace settings (delivery mode, filters). Invalid settings are rejected. |
+| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice *(pending WEB-Q01: the link's form; pending WEB-Q03: how the choice reaches the Matcher)* |
+| GET | /experience | yes | List the experience bank, with the upload's status *(pending WEB-Q02: status before a file arrives)* |
+| DELETE | /experience | yes | Delete the experience bank and the uploaded file |
 | GET | /sources | yes | List catalog sources and the user's private sources |
-| POST | /sources | yes | Add a private page |
-| DELETE | /sources/{sourceId} | yes | Delete a private page |
-| POST | /sources/{sourceId}/refresh | yes | Scrape a source now |
+| POST | /sources | yes | Add a private Greenhouse board, by board token or board URL |
+| DELETE | /sources/{sourceId} | yes | Delete a private source |
+| POST | /sources/{sourceId}/refresh | yes | Check a source now |
 | POST | /subscriptions/{sourceId} | yes | Subscribe to a source |
 | DELETE | /subscriptions/{sourceId} | yes | Unsubscribe from a source |
-| GET | /matches | yes | List matches, newest first |
-| GET | /matches/{postingKey} | yes | Get one match with a signed resume link |
+| GET | /matches | yes | List matches, newest first, a page at a time |
+| GET | /matches/{postingKey} | yes | Get one match with its delivery state, a signed link to its current resume, and its earlier resumes |
+| PUT | /matches/{postingKey}/applied | yes | Mark a match as applied |
+| DELETE | /matches/{postingKey}/applied | yes | Unmark it |
+| POST | /matches/{postingKey}/regenerate | yes | Regenerate the resume for one match *(pending WEB-Q03)* |
 
 Errors:
 - **401:** missing or invalid token, rejected by API Gateway
-- **400:** invalid input, such as a bad URL or a file that isn't `.tex`
+- **400:** invalid input, such as a bad board token, invalid settings, or a file that isn't `.tex`
 - **404:** not found, or belongs to another user
 - **409:** source already added or already subscribed
 - **429:** refresh requested too often
@@ -191,9 +204,12 @@ Each module creates its own Lambdas, queues, roles, and alarms.
 
 ## Security
 
-- **Authentication:** users sign in with Cognito. API Gateway checks each request's token before the API runs.
-- **Keeping users' data apart:** the API gets the user ID from the token, not from the request. All user data in DynamoDB and S3 is stored under that ID, so users can only see their own data.
-- **Links:** upload links only allow one file in the user's own folder, and resume links expire.
+- **Authentication:** users sign in with Cognito, through its hosted sign-in page (authorization code flow with PKCE). The dashboard sends the access token with each request, and API Gateway checks it before the API runs. The API can only be reached through API Gateway.
+- **Sign-up:** whether students can sign themselves up is a setting for each environment. It is off by default, with accounts created by the team, and turned on for the demo.
+- **Keeping users' data apart:** the API gets the user ID from the token, not from the request. All user data in DynamoDB and S3 is stored under that ID, so users can only see their own data. Ownership is checked on the stored record, and another user's record is reported as not found.
+- **Links:** upload links only allow one file in the user's own folder, and resume links expire. Links signed for the dashboard expire after 15 minutes, and only for resumes that have finished rendering.
+- **Cross-origin access:** the API accepts browser requests only from the dashboard's own address.
+- **Logs:** the API never logs tokens, email addresses, or resume text.
 - **IAM:** each Lambda has its own role, with only the access it needs.
 - **Secrets:** the only secret is the CloudFront signing key. It's kept in Secrets Manager, and only the api and notifier can read it. Job boards need no keys, and CI uses OIDC instead of AWS keys.
 

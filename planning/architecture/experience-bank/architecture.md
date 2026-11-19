@@ -366,6 +366,7 @@ Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, sinc
 
 - **EB-Q10: The API, and the shared sections of the RFC, still need updating for EB-001 and EB-002.** The revised RFC (`architecture/revised-rfc/`) now covers this area's sections: the Summary, Goal 3, Bedrock's role, the Data Model, the upload file type, and Demo step 1. Still open:
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
+    - *Answered by Graham Cohick (2026-11-18): it becomes `DELETE /experience` (WEB-001, Accepted). The revised RFC is updated.*
   - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections.
   - Owner: Graham Cohick (API), group (shared sections)
   - Blocks: EB-I01 acceptance
@@ -376,4 +377,7 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| WEB-Q01 | `web-app-and-api/architecture.md` | Agree to change EB-I01 from a presigned PUT to a presigned POST, so S3 enforces the size limit. |
+| WEB-Q02 | `web-app-and-api/architecture.md` | Say which area creates the upload record, and what an unused upload link leaves behind. |
+| WEB-Q03 | `web-app-and-api/architecture.md` | With Luke Campbell: agree where the "regenerate?" choice is stored and which area starts regeneration after a successful parse. |
 | JDM-T05 | `job-discovery-and-matching/implementation-plan.md` | Once this area's implementation plan exists, give the task ID for adopting JDM-I04 in the parser. JDM-T05 links to it. |

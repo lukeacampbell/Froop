@@ -9,7 +9,7 @@ The rules in `planning/AGENTS.md` and `planning/architecture/AGENTS.md` apply he
 
 ## Purpose
 
-_To be written by Graham Cohick._
+Web App and API is how a student gets into Froop and uses it: signing in, uploading a resume, choosing which job boards to follow, setting how they want to hear about matches, and looking back at each match and the resume made for it.
 
 ## Status
 Project phase: 1. Architecture Planning
@@ -20,10 +20,10 @@ Last reviewed: 2026-11-18
 
 | File | Holds | Status |
 |---|---|---|
-| `AGENTS.md` | This guide | Boilerplate. Purpose and ground rules to be written by the owner. |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-012, and Open Questions WEB-Q01 to WEB-Q05 have content. Interfaces are empty. |
+| `AGENTS.md` | This guide | Current. Purpose and ground rules approved by the owner on 2026-11-18. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-012, Interfaces (WEB-I01 and WEB-I02, both Proposed), and Open Questions WEB-Q01 to WEB-Q07 have content. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Out of date since 2026-11-18. Drawn on 2026-11-17 from the initial architecture plus other areas' decisions. It doesn't yet carry the IDs of WEB-001 to WEB-011, and its "Waiting on this owner" note still lists EB-Q10 and DB-Q06, which are answered. No component changed. Update and re-export it before the area goes to `In Review`. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. 16 tasks (WEB-T01 to WEB-T16). WEB-T01 and WEB-T11 are Planned, and the rest are Blocked on named decisions, interfaces, or questions. |
 
 Where to look:
 
@@ -49,4 +49,8 @@ Where to look:
 - Proposing anything that adds cost or a new external service.
 - Moving any item to `Accepted`, or the area to `In Review` or `Approved`.
 
-**Ground rules:** _To be written by Graham Cohick._
+**Ground rules.** Every proposal in this area must uphold these:
+- **The user always comes from the sign-in token,** never from the request.
+- **A student can never see or change another student's data.**
+- **The API carries other areas' features but doesn't redefine their rules.** Upload rules, source validation, matching, and rendering stay with the areas that own them.
+- **Prefer the simplest thing the demo needs.** Anything that adds cost or a new service needs Graham Cohick's say.

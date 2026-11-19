@@ -91,8 +91,8 @@ The item types listed in RFC p.5. Every row is `Proposed`.
 
 | Item type | `PK` | `SK` | Written by (area) | Read by | Definition |
 |---|---|---|---|---|---|
-| Profile | `USER#{sub}` | `PROFILE` | web-app-and-api | delivery (email address) | DB-Q01 |
-| Settings | `USER#{sub}` | `SETTINGS` | web-app-and-api | job-discovery-and-matching, delivery | DB-Q01 |
+| Profile | `USER#{sub}` | `PROFILE` | web-app-and-api | delivery (email address) | DB-I05 |
+| Settings | `USER#{sub}` | `SETTINGS` | web-app-and-api | job-discovery-and-matching, delivery | DB-I05 |
 | Experience (uploads, roles, bullets, skills) | `USER#{sub}` | `DOC#…` | experience-bank | experience-bank only. Other areas go through its package, EB-I03 (EB-010). | DB-I02 |
 | Subscription | `USER#{sub}` | `SUB#{sourceId}` | web-app-and-api (DB-I04, answers DB-Q03) | job-discovery-and-matching, web-app-and-api | DB-Q01 |
 | Match | `USER#{sub}` | `MATCH#{postingKey}` | job-discovery-and-matching (including the digest mark, DEL-011), plus delivery state from delivery and the applied flag from web-app-and-api (DB-Q06) | web-app-and-api, delivery | DB-Q01, DB-I03 |
@@ -150,7 +150,7 @@ Contract: Attributes on `USER#{sub}` / `MATCH#{postingKey}`:
 - the GSI2 keys that mark a match as waiting for a digest (format above, DEL-020). The Matcher writes them when it creates the match (for hourly and daily students). The Notifier removes them after sending, or when the match was skipped or failed, and moves still-pending matches to the next window's bucket (DEL-011, DEL-020).
 
 Writes are conditional updates, so a duplicate SQS message changes nothing.
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell.
 
 #### DB-I04: Greenhouse discovery, durable work and budget records
 Status: Proposed (Luke's design recommendation, 2026-11-18; all shared owners must agree)
@@ -169,6 +169,27 @@ Contract:
 - **Digest index:** preserve DB-I03 ownership, but exact GSI2 partition/sort keys, bucketing and schedule timezone remain a shared agreement (DB-Q09); implementation remains blocked until defined. *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
 Accepted by: —. DB-I01/02/03 remain Proposed; this supplements rather than silently accepts them.
 
+#### DB-I05: Profile and Settings items
+Status: Proposed. Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell (shared area).
+Written by: web-app-and-api
+Consumers: delivery (the email address and delivery mode), job-discovery-and-matching (the filters and delivery mode)
+Contract:
+- **Profile:** `PK=USER#{sub}`, `SK=PROFILE`; `itemType=Profile`, `sub`, `email`, `createdAt`, `updatedAt`.
+  - `email` is the student's verified email address, read from Cognito when the item is created (WEB-003). It isn't updated if the address later changes in Cognito.
+- **Settings:** `PK=USER#{sub}`, `SK=SETTINGS`; `itemType=Settings`, `deliveryMode`, `titleIncludes`, `titleExcludes`, `locationIncludes`, `updatedAt`.
+  - `deliveryMode`: `instant`, `hourly`, or `daily`. Default: `daily`.
+  - `titleIncludes`, `titleExcludes`, `locationIncludes`: lists of strings. Defaults: `titleIncludes` is `["intern"]`, and the other two are empty.
+  - **Limits:** each list holds at most 20 terms. Each term is 1 to 60 characters after trimming, and a list has no two terms that differ only by case. The API enforces this (WEB-008), so readers can rely on it.
+  - **Meaning:** how the Matcher applies the filters is defined by `job-discovery-and-matching` (JDM-005). This contract only fixes their names, types, and limits.
+- **Creation:** the API creates both items together, with a conditional write, the first time a signed-in student calls `GET /me` (WEB-003). A student can't subscribe to a source before then.
+- **Updates:** `PUT /me` replaces the whole Settings item. No other area writes either item.
+- **A missing Settings item** means the student has never opened the dashboard. Readers do no work for that student, and don't assume defaults.
+- **A changed delivery mode** applies to matches created afterwards. A match keeps the `deliveryMode` it was created with (DB-I04).
+- **Timestamps** are ISO 8601 in UTC.
+
+Why the default title filter: empty filters mean no restriction (JDM-005), so a new student who subscribes to a large board would otherwise trigger a ranking call for every posting on it. Whether `intern` also matches "Internship" depends on how the Matcher compares terms (WEB-Q06).
+Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell.
+
 ### Consumes
 - **Provisioning of the table in each environment:** OPS-I02 from `build-and-operation`.
 
@@ -177,6 +198,7 @@ Accepted by: —. DB-I01/02/03 remain Proposed; this supplements rather than sil
 Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB-Q02 GSI3; DB-Q03 API configuration writes/JDM operational writes; DB-Q05 immutable bounded snapshot; DB-Q07 transactional counters and unique reservations (Ryan Fusco agrees, 2026-11-18: EB-017). Ryan and Graham still need to agree. New questions: **DB-Q08** (Ryan/Luke): replace unbounded DB-I03 `pdfHistory` with child records before delivery implementation. *Ryan Fusco's answer (2026-11-18): drop `pdfHistory` entirely; history is the S3 folder `resume/{sub}/{postingKey}/` (DEL-009). DB-I03 is updated above, Proposed until every owner accepts.* **DB-Q09** (Ryan/Luke): define digest GSI2 keys and timing before JDM-T07. *Ryan Fusco's answer (2026-11-18): DEL-020.* Both block final DB-I04 acceptance.
 
 - **DB-Q01: What attributes do the remaining item types have?** That's Profile, Settings, Subscription, Match (apart from the delivery state), Source, Posting, and Cost counter. The owner of the area that writes each type needs to propose them.
+  - *Graham Cohick's answer for Profile and Settings (2026-11-18): DB-I05, Proposed until every owner accepts it. Luke Campbell's proposal for the other types is DB-I04.*
   - Owner: Graham Cohick (Profile, Settings), Luke Campbell (Subscription, Match, Source, Posting, Cost counter)
   - Blocks: DB-I01 acceptance, delivery's use of postings and settings
 - **DB-Q02: LSI1 has to be decided before the first deploy.** *Proposed answer: GSI3 (DB-I04). Luke Campbell proposed it and Ryan Fusco agrees (2026-11-18). Graham Cohick agrees (2026-11-18), so every owner agrees: the table has GSI3 and no local secondary index. DB-I01 and DB-I04, which define GSI3, stay Proposed until every owner accepts them as a whole.* A local secondary index can only be created along with the table. It also limits each user's partition to 10 GB, and every user's data lives in one partition. The alternatives are a GSI, or sorting matches by an `SK` that includes the date.

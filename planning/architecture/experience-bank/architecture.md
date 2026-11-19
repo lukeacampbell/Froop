@@ -352,7 +352,7 @@ Contract: A Python package owned by this area (EB-010). It is the only supported
 - `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api). Waiting for: Ryan Fusco (provider), Luke Campbell (consumer: job-discovery-and-matching).
 
 ### Consumes
 - **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), and the section categories, entries, and skill categories (EB-016).
@@ -377,6 +377,7 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| WEB-Q07 | `web-app-and-api/architecture.md` | Once the implementation plans for `experience-bank`, `database`, and `build-and-operation` exist, give the task IDs that WEB-T02 to WEB-T08 and WEB-T16 depend on. |
 | WEB-Q01 | `web-app-and-api/architecture.md` | Agree to change EB-I01 from a presigned PUT to a presigned POST, so S3 enforces the size limit. |
 | WEB-Q02 | `web-app-and-api/architecture.md` | Say which area creates the upload record, and what an unused upload link leaves behind. |
 | WEB-Q03 | `web-app-and-api/architecture.md` | With Luke Campbell: agree where the "regenerate?" choice is stored and which area starts regeneration after a successful parse. |

@@ -171,6 +171,7 @@ Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-0
 ## Open Questions
 
 - **JDM-Q01:** Graham: agree JDM-I01, settings (`titleIncludes`, `titleExcludes`, `locationIncludes`, `deliveryMode`), and durable regeneration command producer contract. Upload regeneration must wait for successful bank replacement; per-match commands must authorize `sub` and use an idempotent request ID. Blocks JDM-T03/T07/T09; API implementation task IDs do not exist yet.
+  - **Graham Cohick's answers so far (2026-11-18):** the four settings, their limits, and their defaults are proposed in DB-I05. The endpoints are decided in WEB-001. Still open on his side: JDM-I01 (waiting on source ID format, WEB-Q04) and the regeneration producer contract (WEB-Q03).
 - **JDM-Q02:** Ryan: agree JDM-I03 generation/deduplication contract, EB-I02/03 usage, and JDM-I04 parser cost reservations. Confirm how SES send/record failures are reconciled: an SQS/digest conditional write alone cannot guarantee exactly-once external email. Blocks JDM-T06/T08/T09 and full duplicate-email demo signoff. Provider implementation task IDs do not exist yet.
   - **Ryan Fusco's answers (2026-11-18):**
     - JDM-I03 accepted, including `requestId` and `generation` (DEL-017).
@@ -215,6 +216,9 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 |---|---|---|
 | WEB-Q03 | `web-app-and-api/architecture.md` | With Ryan Fusco: agree where the "regenerate?" choice is stored, which area starts regeneration after a successful parse, and how the per-match regenerate request reaches the Matcher. Feeds JDM-Q01. |
 | WEB-Q04 | `web-app-and-api/architecture.md` | Use a URL-safe separator in source IDs (JDM-002), as DEL-Q15 asks for `postingKey`. |
+| WEB-T07, WEB-T10 | `web-app-and-api/implementation-plan.md` | The API task IDs that JDM-T03, JDM-T07, and JDM-T09 were waiting for now exist: WEB-T07 (sources, subscriptions, refresh) and WEB-T10 (regeneration requests). Link them from those tasks. |
+| DB-I05 | `database/architecture.md` | As a co-owner and reader, accept the Profile and Settings items: the four settings from JDM-Q01, their limits (20 terms of up to 60 characters per list), and the defaults (daily; title includes "intern"). |
+| WEB-Q06 | `web-app-and-api/architecture.md` | Say how the Matcher compares a filter term with a title: does `intern` match "Internship"? |
 | SYS-Q01 | `architecture/AGENTS.md` | Confirm shared ownership of `build-and-operation`, with Ryan Fusco coordinating. |
 | SYS-Q02 | `architecture/AGENTS.md` | Confirm shared ownership of `database`, with Ryan Fusco coordinating. |
 | SYS-Q03 | `architecture/AGENTS.md` | Group: confirm which Terraform module holds each area's resources, including whether the Matcher sits in `ingestion` or `resumes`. |

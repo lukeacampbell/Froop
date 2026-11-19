@@ -198,7 +198,7 @@ Reviewed 2026-11-18 for Graham Cohick, against the Initial Architecture above an
 17. **This area's Requirements Intake row is missing most of what the API needs.**
     - **Finding:** the row in `build-and-operation` (OPS-Q07) is taken from the RFC: the user pool and hosted UI, the HTTP API and authorizer, the `api` image, CloudFront and the static site, and read access to the signing key.
     - **Impact:** the API's role would lack permissions it needs on day one, and OPS-I02 and OPS-I03 can't be accepted.
-    - **Recommendation:** once the items above are decided, add these to the row:
+    - **Recommendation:** once the items above are decided, add these to the row (done on 2026-11-18, as Proposed, except the regeneration queue):
       - **Table:** read and write on the items this area writes, and queries on GSI1 (private sources) and GSI3 (the feed).
       - **Uploads bucket:** permission to write `uploads/`, which the upload link relies on, and whatever the bank package's delete needs (EB-I03).
       - **Resumes bucket:** permission to list `resume/`.
@@ -252,7 +252,7 @@ Alternatives:
 - One `PATCH /matches/{postingKey}` for the applied flag. Rejected: separate `PUT` and `DELETE` are safe to repeat and need no request body.
 Consequences:
 - The revised RFC's API section changes.
-- The full contract (request and response shapes) is to be written as WEB-I01 when this area's interfaces are defined.
+- The full contract (request and response shapes) is WEB-I01.
 - `delivery` and `job-discovery-and-matching` can cite these endpoints in DEL-Q12 and JDM-Q01.
 
 ### WEB-002: Sign in with the authorization code flow and PKCE, and send the access token
@@ -282,7 +282,7 @@ Decision:
 Alternatives:
 - A Cognito post-confirmation trigger. Rejected: one more Lambda and image for the same result.
 Consequences:
-- The default settings, and the attributes of both items, are still to be proposed in `database` (DB-Q01).
+- The default settings, and the attributes of both items, are proposed in `database` as DB-I05.
 - A later change of email address in Cognito isn't copied to the profile. That is out of scope for this version.
 
 ### WEB-004: Self sign-up is a setting for each environment, off by default
@@ -358,7 +358,7 @@ Decision:
 Alternatives:
 - Validate the delivery mode only. Rejected: unbounded filter lists make the item large and slow every filtering pass.
 Consequences:
-- The limits themselves are to be agreed with Luke Campbell (JDM-Q01) and recorded with the Settings attributes (DB-Q01).
+- The limits are proposed in DB-I05 (20 terms of up to 60 characters in each list), for Luke Campbell to agree (JDM-Q01).
 
 ### WEB-009: The dashboard has five screens
 Status: Accepted (Graham Cohick, 2026-11-18)
@@ -414,11 +414,61 @@ Consequences:
 
 ### Provides
 
-_None yet._
+#### WEB-I01: Public REST API
+Status: Proposed
+Consumers: the dashboard (this area). Other areas don't call it, but each relies on the endpoints that carry its feature: experience-bank (`/uploads`, `/experience`), job-discovery-and-matching (`/sources`, `/subscriptions`, the settings in `/me`), and delivery (`/matches`).
+Contract: the endpoints in WEB-001, with these shapes. Parts marked *(pending)* wait on the named question.
+- **Common rules:**
+  - Requests and responses are JSON. Every endpoint except `GET /health` needs `Authorization: Bearer <access token>` (WEB-002).
+  - The user is always the token's `sub`. No endpoint takes a user ID (WEB-005).
+  - Errors are `{"error": {"code", "message"}}` with status 400, 401, 404, 409, or 429. Messages never contain resume text.
+  - A request body with unknown fields is rejected with 400.
+  - IDs (`sourceId`, `postingKey`, `docId`) are opaque strings to the dashboard.
+- **`GET /me`** → `{profile: {email}, settings: {deliveryMode, titleIncludes, titleExcludes, locationIncludes}}`. Creates both on first use (WEB-003, DB-I05).
+- **`PUT /me`** takes the whole `settings` object and returns the same shape as `GET /me`. Invalid settings: 400 (WEB-008, DB-I05).
+- **`POST /uploads`** takes `{regenerate}` (boolean, default false) and returns `{docId, upload, expiresAt}`, where `upload` is what the browser needs to send the file straight to S3 *(pending WEB-Q01: PUT or POST; pending WEB-Q03: what happens to `regenerate`)*.
+- **`GET /experience`** → `{status, reason, docId, bank}`.
+  - `status` is `none`, `pending`, `parsed`, `parsed_with_unclassified`, or `failed` (EB-I03 `upload_status`), and `reason` is set when it failed *(pending WEB-Q02: when `pending` starts)*.
+  - `bank` is what EB-I03 `get_bank` returns: the header, then items grouped by section, each with `source` and `text`. It is absent when there is no bank.
+- **`DELETE /experience`** → 204. Deleting when there is no bank also returns 204.
+- **`GET /sources`** → `{catalog: [source], private: [source]}`, where a source is `{sourceId, displayName, boardToken, visibility, subscribed, lastSuccessAt, lastErrorCode}` (JDM-I01). `private` holds only the student's own.
+- **`POST /sources`** takes `{board}`, a Greenhouse board token or board URL, and returns 201 with the source. Invalid board: 400. Already added: 409. Adding a board doesn't subscribe to it. The dashboard follows with a subscribe call *(validation rules: JDM-I01)*.
+- **`DELETE /sources/{sourceId}`** → 204. Only the student's own private sources. It also removes the student's subscription to that source.
+- **`POST /sources/{sourceId}/refresh`** → 202. Too soon: 429 with `retryAfterSeconds` *(cooldown: JDM-I01)*.
+- **`POST /subscriptions/{sourceId}`** → 201. Already subscribed: 409. **`DELETE`** → 204, also when not subscribed.
+- **`GET /matches?limit=&cursor=`** → `{items: [{postingKey, title, company, location, createdAt, appliedAt, renderStatus}], nextCursor}`. `limit` defaults to 25, with a maximum of 100. `nextCursor` is absent on the last page (WEB-006).
+- **`GET /matches/{postingKey}`** → `{postingKey, posting: {title, company, location, applyUrl, description}, createdAt, appliedAt, renderStatus, renderReason, notifyStatus, resume, earlierResumes}`.
+  - `posting` is the match's own copy of the posting (DB-Q05).
+  - `resume` is `{generation, url, expiresAt}` when `renderStatus` is `rendered`, and null otherwise. `earlierResumes` is a list of the same shape (WEB-007, DEL-I01, DB-I03).
+- **`PUT /matches/{postingKey}/applied`** → `{appliedAt}`. Repeating it keeps the first time. **`DELETE`** → 204 (DB-Q06).
+- **`POST /matches/{postingKey}/regenerate`** → 202 with `{requestId}`. Already running for this match: 409 *(pending WEB-Q03)*.
+
+Path formats for `sourceId` and `postingKey` are pending WEB-Q04 and DEL-Q15.
+Accepted by: —
+
+#### WEB-I02: Student identity
+Status: Proposed
+Consumers: experience-bank, job-discovery-and-matching, delivery, database
+Contract:
+- A student is identified everywhere by the `sub` claim of their Cognito access token: a fixed string that never changes for that account and is never given to another.
+- Only the API turns a token into a `sub`. Other areas receive it already checked, in an S3 key the API issued (EB-I01), an item the API wrote, or a message that came from one.
+- The email address is not part of the identity. It is in the Profile item (DB-I05).
+- Deleting a Cognito user doesn't delete that student's data (WEB-012).
+Accepted by: —
 
 ### Consumes
 
-_None yet._
+Accepted by this area as a consumer:
+- **The experience bank package:** EB-I03 from `experience-bank`. The API lists the bank, reads its upload status, and deletes it only through this package. Graham Cohick accepted it on 2026-11-18.
+- **Resume PDF objects:** DEL-I01 from `delivery`. The API signs links to them and lists a match's earlier resumes (WEB-007). Graham Cohick accepted it on 2026-11-18.
+- **Match delivery state:** DB-I03 in `database`. The dashboard shows `renderStatus`, `renderReason`, and `notifyStatus`, and the API reads `pdfKey` to sign links. Graham Cohick accepted it on 2026-11-18 as a co-owner.
+
+Used, but not accepted yet:
+- **The upload object contract:** EB-I01 from `experience-bank`. Held until WEB-Q01 (PUT or POST) is answered.
+- **Greenhouse sources, subscriptions, and refresh:** JDM-I01 from `job-discovery-and-matching`. Held until WEB-Q04 (source ID format) is answered.
+- **Regeneration requests to the Matcher:** not defined yet. JDM-Q01 asks this area for a producer contract, and WEB-Q03 asks who starts regeneration and where the choice is stored.
+- **Table conventions and the items this area reads or writes:** DB-I01 and DB-I04 in `database` (Subscription, Source, Match, and GSI1 and GSI3). This area writes Profile and Settings as defined in DB-I05, which it proposed.
+- **Deployment, storage, IAM and secrets, and observability:** OPS-I01 to OPS-I04 from `build-and-operation`. Held until this area's Requirements Intake row is agreed (OPS-Q07).
 
 ## Open Questions
 
@@ -434,6 +484,12 @@ _None yet._
 - **WEB-Q04: Can source IDs use a URL-safe separator?** `private:{sub}:gh:{boardToken}` and `gh:{boardToken}` (JDM-002) appear in `/sources/{sourceId}` and `/subscriptions/{sourceId}`. DEL-Q15 raises the same problem for `postingKey` (review item 8).
   - Owner: Luke Campbell (JDM-002)
   - Blocks: the sources and subscriptions endpoints in WEB-I01
+- **WEB-Q06: Does the title filter `intern` match "Internship"?** DB-I05 proposes `titleIncludes: ["intern"]` as the default for new students, to limit ranking calls. JDM-005 says filters "match case-insensitive normalized plain text" but not whether a term matches part of a word. If it matches whole words only, the default needs both `intern` and `internship`.
+  - Owner: Luke Campbell (JDM-005)
+  - Blocks: the default in DB-I05
+- **WEB-Q07: Which tasks in other areas do this area's tasks depend on?** `implementation-plan.md` needs, but can't yet cite: the bootstrap, the table and buckets, the signing-key secret, and the CI workflows (`build-and-operation`); the table design (`database`); and the bank package (`experience-bank`). None of those areas has an implementation plan yet, so the tasks cite interfaces instead (OPS-I01 to OPS-I03, DB-I01, EB-I03).
+  - Owner: Ryan Fusco (coordinator of both shared areas, and owner of `experience-bank`)
+  - Blocks: the "Depends on" lines of WEB-T02 to WEB-T08 and WEB-T16
 - **WEB-Q05: Is account deletion in this version?** *Answered by Graham Cohick (2026-11-18): no (WEB-012). The group still has to agree, because Non-Goals is a shared section of the RFC (SYS-Q05).*
   - Owner: group
   - Blocks: nothing yet
@@ -445,11 +501,7 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 | ID | Defined in | What's needed |
 |---|---|---|
 | EB-I01 | `experience-bank/architecture.md` | Accept the upload contract as its consumer: the key layout, `.tex` only, and the size limit. |
-| EB-I03 | `experience-bank/architecture.md` | Accept the experience-bank package as the API's way to list and delete the bank (EB-010). |
-| DEL-I01 | `delivery/architecture.md` | Accept the resume PDF contract as its consumer: the API signs dashboard links, and resumes never expire (DEL-007). |
 | DEL-Q12 | `delivery/architecture.md` | The three endpoints are decided (WEB-001). Still needed: how the regenerate choice and request reach the Matcher (WEB-Q03). |
-| DB-Q01 | `database/architecture.md` | Propose the attributes of Profile and Settings items. |
-| DB-I01 to DB-I03 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the match delivery state (the dashboard shows it). |
-| OPS-Q07 | `build-and-operation/architecture.md` | Confirm this area's row in the Requirements Intake. |
+| DB-I01, DB-I02, DB-I04 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the discovery, work, and cost records. Held until the open database questions settle. |
 | OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept the four contracts: deployment, storage, IAM and secrets, and observability. Held until this area's review confirms its Requirements Intake row (OPS-Q07). |
 | JDM-Q01, JDM-I01 | `job-discovery-and-matching/architecture.md` | Agree Greenhouse-only source input, API-owned source/subscription writes, settings filters and regeneration producer contract; update API diagram/help text. |

@@ -446,7 +446,7 @@ Contract:
 - **History:** every file under `resume/{sub}/{postingKey}/` is a resume for that match. The newest generation is current.
 - **Lifetime:** never deleted while the match exists (DEL-007).
 - **Missing PDF:** an object may not exist yet (still rendering) or may have been skipped (DEL-003). The match's `renderStatus` (DB-I03) says which.
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api). Waiting for: Ryan Fusco (provider).
 
 ### Consumes
 - **The SQS render message:** JDM-I03 from `job-discovery-and-matching`. Ryan Fusco accepted it on 2026-11-18 as the consumer. It covers DEL-010 and DEL-017.
@@ -490,4 +490,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| _None yet._ | | |
+| DB-I05 | `database/architecture.md` | As a co-owner and reader, accept the Profile and Settings items: the email address and the delivery mode (default: daily). |

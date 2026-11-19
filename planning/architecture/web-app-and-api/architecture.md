@@ -479,12 +479,15 @@ Used, but not accepted yet:
   - Owner: Ryan Fusco
   - Blocks: the upload-status part of WEB-I01
 - **WEB-Q03: Where is the "regenerate?" choice stored, and which area starts regeneration once the new bank is current?** The API receives the choice before the file is uploaded, and regeneration must wait for a successful parse (review item 2, JDM-Q01, DEL-008). Proposed: the API stores the choice with the `docId` at `POST /uploads`, and `job-discovery-and-matching` holds the work until that `docId` is the current bank. The same answer should cover how the per-match regenerate request reaches the Matcher, and its request ID.
+  - **Luke’s answer (2026-11-18):** Concrete proposal: JDM-010/I05. API persists upload opt-in/per-match commands; existing JDM dispatcher waits for the exact successful current docId and fans out. Same request key is idempotent; concurrent different key returns 409. Await Graham/Ryan agreement to the defined API and status contracts.
   - Owner: Luke Campbell, Ryan Fusco
   - Blocks: answering JDM-Q01 and DEL-Q12, the regenerate endpoints in WEB-I01
 - **WEB-Q04: Can source IDs use a URL-safe separator?** `private:{sub}:gh:{boardToken}` and `gh:{boardToken}` (JDM-002) appear in `/sources/{sourceId}` and `/subscriptions/{sourceId}`. DEL-Q15 raises the same problem for `postingKey` (review item 8).
+  - **Luke’s answer (2026-11-18):** Accepted source spelling: gh.{boardToken} and private.{base64url(UTF-8 sub), no padding}.gh.{boardToken}, per JDM-009. Record ownership remains authoritative. This settles Luke’s ID choice; Graham must accept the updated JDM-I01.
   - Owner: Luke Campbell (JDM-002)
   - Blocks: the sources and subscriptions endpoints in WEB-I01
 - **WEB-Q06: Does the title filter `intern` match "Internship"?** DB-I05 proposes `titleIncludes: ["intern"]` as the default for new students, to limit ranking calls. JDM-005 says filters "match case-insensitive normalized plain text" but not whether a term matches part of a word. If it matches whole words only, the default needs both `intern` and `internship`.
+  - **Luke’s answer (2026-11-18):** Yes: normalized case-insensitive literal substring matching, so intern matches Internship (also Internal, an explicit simple-filter limitation). No stemming/regex. See Accepted JDM-009; DB-I05 intern default can stand.
   - Owner: Luke Campbell (JDM-005)
   - Blocks: the default in DB-I05
 - **WEB-Q07: Which tasks in other areas do this area's tasks depend on?** `implementation-plan.md` needs, but can't yet cite: the bootstrap, the table and buckets, the signing-key secret, and the CI workflows (`build-and-operation`); the table design (`database`); and the bank package (`experience-bank`). None of those areas has an implementation plan yet, so the tasks cite interfaces instead (OPS-I01 to OPS-I03, DB-I01, EB-I03).
@@ -505,3 +508,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 | DB-I01, DB-I02, DB-I04 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the discovery, work, and cost records. Held until the open database questions settle. |
 | OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept the four contracts: deployment, storage, IAM and secrets, and observability. Held until this area's review confirms its Requirements Intake row (OPS-Q07). |
 | JDM-Q01, JDM-I01 | `job-discovery-and-matching/architecture.md` | Agree Greenhouse-only source input, API-owned source/subscription writes, settings filters and regeneration producer contract; update API diagram/help text. |
+| JDM-I01, JDM-I05 | `job-discovery-and-matching/architecture.md` | Luke answered source IDs/filter semantics and proposed regeneration intake. Agree final source format and regeneration API persistence/idempotency contract. |

@@ -478,11 +478,12 @@ Review of Luke Campbell's contribution (2026-11-18): C1 â†’ DEL-017, C2 and Q1 â
     - re-ranking one match on request, using the match's own copy of the posting details (DB-Q05)
 
   Ryan Fusco can propose these in `job-discovery-and-matching` as a contributor.
-  - **Status (2026-11-18):** Luke Campbell's proposed answers are JDM-007 and JDM-I03. Ryan Fusco accepted JDM-I03 as the consumer, including the generation extension (DEL-017). Still waiting for Luke Campbell to accept JDM-007 and JDM-I03 on his side.
+  - **Status (2026-11-18):** Luke Campbell's proposed answers are JDM-007 and JDM-I03. Ryan Fusco accepted JDM-I03 as the consumer, including the generation extension (DEL-017). **Answered by Luke Campbell (2026-11-18):** accepts JDM-007/I03, DEL-010/011/014/017 and the DEL-020 digest windows; rationale in JDM-008. No remaining Luke-side blocker.
   - Owner: Luke Campbell
   - Blocks: DEL-010, DEL-011, DEL-014
 - **DEL-Q15: Use a URL-safe separator in `postingKey`.** JDM-002 proposes `gh:{boardToken}:{jobPostId}`. The key appears in S3 keys (DEL-009), CloudFront signed URLs, and `/matches/{postingKey}`. Colons get percent-encoded inconsistently, which breaks signed-URL checks. Board tokens are limited to `[A-Za-z0-9_-]` (JDM-I01), so `.` can't appear in a token. **Ryan Fusco's recommendation (2026-11-18):** `gh.{boardToken}.{jobPostId}`.
-  - Owner: Luke Campbell (JDM-002)
+  - **Answered by Luke Campbell (2026-11-18):** use `gh.{boardToken}.{jobPostId}` per Accepted JDM-008. Dot-separated provider IDs are unambiguous under the board-token grammar and avoid extra separator encoding. Colons are not inherently forbidden; use consistent URL construction/signing regardless. DEL-Q15 is resolved.
+  - Owner: Luke Campbell (JDM-008)
   - Blocks: DEL-009 keys, DEL-I01
 ## Requests From Other Areas
 

@@ -67,7 +67,7 @@ Keep it in step with this file (see "Keeping Area Diagrams Current" in `planning
 
 ## Decisions
 
-Decision authority: JDM-001 records Luke's explicit instruction. The remaining choices are concrete recommendations made under Luke's request to use best judgment, kept Proposed where implementation or another owner's contract still needs agreement. No approval is attributed to Ryan or Graham.
+Decision authority: JDM-001 records Luke's explicit instruction. The remaining choices are concrete recommendations made under Luke's request to use best judgment, kept Proposed where implementation or another owner's contract still needs agreement. The 2026-11-18 urgent-question pass records Luke’s decisions under his explicit request to answer assigned questions using best judgment. Ryan’s recorded acceptances are preserved; no agreement is attributed to Graham.
 
 ### JDM-001: Discover jobs only through the Greenhouse Job Board API
 Status: Accepted (Luke Campbell, explicit scope instruction, 2026-11-18)
@@ -104,19 +104,19 @@ Context: DynamoDB writes and SQS sends are not one transaction.
 Decision: Store per-user work under `WORK#` before sending a match-queue reference. New-match work ID is deterministic for `(sub, postingKey)`; regeneration uses `(sub, postingKey, requestId)`. Queue messages refer to work IDs. Claim work with a conditional lease and fencing generation. Persist ranking output before delivery, then transactionally create/update the match and mark the work `render_pending`. Send the stored render payload and mark work `complete` only after SQS acknowledges. Dispatcher retries due work and expired leases. Every state update checks lease ownership/generation; duplicate messages cannot overwrite newer work.
 Reasoning: A crash can cause a repeated send, but cannot permanently lose a committed match. Saving ranking output also avoids needless repeat AI calls.
 Alternatives: DynamoDB Streams/outbox infrastructure is deferred; silent best-effort enqueue is rejected.
-Consequences: Renderer must deduplicate by `(sub, postingKey, docId, requestId)` and reject stale generations (JDM-I03). Only one render-changing operation per match is active at a time; regeneration waits until the prior delivery operation is terminal, preventing old workers replacing new PDFs. New-match conditional creation preserves one match per user/posting. Recheck subscription before starting a new match; regeneration authorizes the owned match instead. DLQ messages remain recoverable by operator redrive; exhausted attempts are `failed`, not automatically requeued forever. Digest/email exactly-once behavior requires delivery review (JDM-Q02).
+Consequences: Renderer must deduplicate by `(sub, postingKey, docId, requestId)` and reject stale generations (JDM-I03). Only one render-changing operation per match is active at a time; regeneration waits until the prior delivery operation is terminal, preventing old workers replacing new PDFs. New-match conditional creation preserves one match per user/posting. Recheck subscription before starting a new match; regeneration authorizes the owned match instead. DLQ messages remain recoverable by operator redrive; exhausted attempts are `failed`, not automatically requeued forever. Delivery uses Ryan’s at-most-once email policy (DEL-018): an uncertain send is not retried automatically and may result in no email; the dashboard retains the result.
 
 ### JDM-005: Filter deterministically, then rank existing bank IDs in one call
 Status: Proposed
 Date: 2026-11-18
 Context: Discovery and resume tailoring have different responsibilities.
-Decision: All subscribed postings passing configured filters become candidates. Empty filters mean no restriction. Within title or location include lists use OR; across dimensions use AND; exclusions win. Match case-insensitive normalized plain text; do not infer remote eligibility from missing location. API settings schema must agree (JDM-Q01). Read the bank only through EB-I03 and normalize skill terms with EB-I02. Missing bank leaves work `waiting_bank`; exclude unclassified sections. One Bedrock call ranks role/project/bullet/skill IDs using the job description and bank, with no generated resume text or separate requirement-extraction call.
+Decision: All subscribed postings passing configured filters become candidates. Empty filters mean no restriction. Within title or location include lists use OR; across dimensions use AND; exclusions win. Match case-insensitive normalized plain text; do not infer remote eligibility from missing location. API settings schema must agree (JDM-Q01). Read the bank only through EB-I03; EB-I02 is deferred in v1 (JDM-008). Missing bank leaves work `waiting_bank`; exclude unclassified sections. One Bedrock call ranks role/project/bullet/skill IDs using the job description and bank, with no generated resume text or separate requirement-extraction call.
 Reasoning: Explainable filtering limits AI spend. One ranking call is simpler than a separate extraction pipeline, and ID validation preserves the student's words.
 Alternatives: AI decides whether a user qualifies, or rewrites resume bullets: rejected for opacity and verbatim risks.
 Consequences: Ranking returns finite scores in [0,1], with one common relevance rubric across roles, projects, and their bullets. Validate all IDs against the same `docId`, parent relationships, uniqueness, allowed sections, ordering and score ranges. Stable ID breaks ties. Reject malformed/hallucinated output; one bounded retry reserves a fresh cost allowance, then visible failure. Job descriptions are untrusted data, never instructions or executable HTML. Recheck bank version before commit; changed bank returns to `waiting_bank`/rerank instead of rendering stale IDs. Requests over configured model input/output limits fail visibly rather than silently dropping resume sections.
 
 ### JDM-006: Share conservative cost reservations; defer without a retry storm
-Status: Proposed
+Status: Accepted (Luke Campbell, delegated urgent-question answers, 2026-11-18)
 Date: 2026-11-18
 Context: Matcher and bank parser share the proposed hourly and daily caps.
 Decision: JDM-I04 provides a shared reservation package to both callers. Reserve integer micro-USD against all three counters atomically before every attempt: $1/user/hour, $5/platform/hour, $1.50/platform/UTC day, configurable per OPS-002/010. Use a configured model price and an upper bound from input tokens plus maximum output tokens. Each attempt gets a unique reservation ID; uncertain outcomes remain charged conservatively and cannot be reused for another invocation. Record actual usage separately; no refund in v1. Missing/unknown pricing fails closed.
@@ -125,13 +125,45 @@ Alternatives: Check-after-call and SQS retrying until midnight are rejected.
 Consequences: When denied, persist `deferred_budget` and `nextAttemptAt` at the latest reset among the exhausted windows, then acknowledge SQS. Dispatcher resumes later. A single call larger than a whole cap becomes `blocked_configuration`, not an infinite daily retry. Bank-ready work and backlog use oldest-due-first ordering within bounded pages. $1.50/day can consume $46.50 in a 31-day month; it is not a guarantee that total AWS charges fit $50. Parser and Matcher use the same shared package (EB-004, DB-I04); model choice remains an OPS configuration decision.
 
 ### JDM-007: Preserve delivery's ranked payload, digest and regeneration behavior
-Status: Proposed
+Status: Accepted (Luke Campbell, delegated urgent-question answers, 2026-11-18)
 Date: 2026-11-18
 Context: DEL-010/011/014 already describe Ryan's expected Matcher behavior.
 Decision: Supply the ranked shape in JDM-I03. New hourly/daily matches get the DB-I03 digest mark atomically with creation. Regenerations get no new digest mark and no email. Upload-triggered regeneration selects owned, unapplied matches whose postings are active and unexpired; per-match regeneration uses the retained posting snapshot even when the posting has closed. Read current bank and emit `reason: regenerate`.
 Reasoning: This preserves Ryan's product behavior while making retry and stale-version handling explicit.
 Alternatives: Regenerate every historical match automatically: rejected because users may already have submitted those resumes.
-Consequences: Delivery must agree the request/generation extensions and DB must finalize digest index keys. Luke's recommended agreement is recorded here; existing Accepted decisions in Ryan's files are not rewritten. See JDM-Q02 and DB-I04.
+Consequences: Luke accepts DEL-010/011/014/017/020 and JDM-I03. At creation, hourly matches target the next strictly future UTC hour; daily matches target the next strictly future 13:00 UTC. At exactly a send boundary, target the following window to avoid racing its reader. Set `GSI2PK=DIGEST#hourly#{YYYY-MM-DDTHH}` or `DIGEST#daily#{YYYY-MM-DD}` and `GSI2SK={sub}#{createdAt}#{postingKey}` atomically with the match, following DB-I03. Instant matches and regeneration requests get no new digest keys. UTC timing avoids per-user timezone scheduling; it deliberately shifts local clock time with daylight saving. Shared database acceptance remains pending.
+
+### JDM-008: Close the urgent delivery, bank and identity handoffs
+Status: Accepted (Luke Campbell, delegated urgent-question answers, 2026-11-18)
+Date: 2026-11-18
+Context: Ryan accepted JDM-I03/I04 and supplied DEL-020, but Luke’s responses were blocking delivery and parser planning.
+Decision:
+- **DEL-Q15:** use **postingKey = gh.{boardToken}.{jobPostId}**. This overrides only the colon-delimited posting-key spelling proposed in JDM-002; source IDs are unchanged. Board tokens cannot contain dots under JDM-I01 and job-post IDs are decimal strings, so the parts are unambiguous. There is no deployed data migration in this planning-only repository.
+- **DEL-Q13:** accept ranked role/project/bullet/skill IDs with comparable scores, request ID/generation checks, digest marks and the regeneration rules in JDM-007/I03. At-most-once email (DEL-018) can miss an email after an uncertain send; do not silently retry it. Users can still retrieve the resume from the dashboard.
+- **EB-I03:** accept the bank package as the Matcher’s sole bank-access interface, excluding unclassified items. Defer EB-I02 and canonical-term dictionaries in v1, as Ryan requested; no required dictionaryVersion on new matches until that feature returns.
+- **DB-Q05/08:** preserve an immutable bounded posting snapshot on each match; retain PDF history in the S3 match folder per DEL-009, with only the current pdfKey on the match. No growing history array or extra history item type.
+Reasoning: These choices align with the consumers’ existing work, eliminate a dictionary dependency and duplicate history storage, and settle a single key spelling before code exists. Dots simplify URL handling; this is a naming convention, not a claim that colons are forbidden in S3. URL construction/signing must remain consistent for every field.
+Alternatives: Fuzzy identity, dictionary normalization now, and a second PDF history store add work without helping the current Greenhouse demo.
+Consequences: JDM-I03/I04 are agreed at the producer/consumer boundary. Shared DB/OPS proposals retain their required group approval. JDM-002/005 remain Proposed for their other behavior. The implementation plan and current RFC carry these resolved details.
+
+### JDM-009: Settle source IDs and filter matching for the API
+Status: Accepted (Luke Campbell, delegated urgent-question answers, 2026-11-18)
+Date: 2026-11-18
+Context: Graham added WEB-Q04 and WEB-Q06 after the original urgent answers; DB-I05 now defines the settings schema.
+Decision: Catalog source IDs are gh.{boardToken}; private source IDs are private.{ownerKey}.gh.{boardToken}, where ownerKey is unpadded base64url of the UTF-8 Cognito sub. Preserve board-token spelling. This overrides only the source-ID spellings in JDM-002; posting keys follow JDM-008. Authorize using the source record’s ownerSub, never by trusting a decoded path segment.
+Decision: Filters use literal substring matching after Unicode NFKC normalization, case folding, trimming and collapsing whitespace on both term and field. No regex, stemming, synonym dictionary or whole-word requirement. Thus intern matches Intern, Internship and Internal; the latter is a known false positive of this deliberately simple rule. Title exclusions take precedence; OR within each include list and AND between title/location dimensions. Empty includes impose no restriction. A missing location fails a nonempty location filter, and is never inferred to mean remote.
+Reasoning: One separator convention simplifies route construction; base64url keeps any valid sub unambiguous without assuming its character set. Substring matching makes Graham’s intern default useful with no dictionary dependency, at the cost of some visible false positives.
+Alternatives: Colon-separated IDs, UUID-only assumptions, whole-word matching and semantic classification add either inconsistent handling or unnecessary complexity for this version.
+Consequences: Luke accepts DB-I05 as a reader/co-owner: daily delivery, titleIncludes=[intern], empty remaining filters, 20 terms/list and 1–60 trimmed characters/term. Missing Settings means no matching work, not implicit defaults. Existing matches keep their original delivery mode. DB-I05 still needs Ryan’s acceptance. JDM-I01 remains Proposed pending Graham’s agreement to the final source contract.
+
+### JDM-010: Route regeneration through persisted JDM work
+Status: Proposed (Luke’s concrete answer to WEB-Q03; awaiting Graham and Ryan)
+Date: 2026-11-18
+Context: WEB-T10 needs a durable way to retain the upload choice and reach the Matcher. The parser already publishes the current bank through its package.
+Decision: Use JDM-I05 below. The API persists an upload-regeneration work record only when regenerate=true, keyed by the authenticated sub and docId, before returning the upload response. JDM’s existing dispatcher waits for that exact upload to become the successful current bank, then expands it into per-match work. The parser does not send a second regeneration event. Per-match API requests persist work before best-effort match-queue enqueue; dispatcher recovery covers a failed enqueue.
+Reasoning: Reusing the existing work store and dispatcher avoids a new queue, event service or parser-to-Matcher callback. The choice cannot disappear with a failed message send, and a failed upload cannot regenerate against the old bank.
+Alternatives: API fire-and-forget queue messages lose intent on failures; parser-triggered fanout adds a second owner and duplicate-trigger path.
+Consequences: Graham must agree API writes/idempotency semantics; Ryan must agree per-upload status lookup through EB-I03. DB-I04 and OPS-I05 must include these work fields/API permissions before implementation. This answer is reviewable but is not recorded as their approval.
 
 ## Interfaces
 
@@ -140,8 +172,8 @@ Consequences: Delivery must agree the request/generation extensions and DB must 
 #### JDM-I01: Greenhouse sources, subscriptions and refresh
 Status: Proposed
 Consumers: web-app-and-api
-Contract: Shared source validation accepts a token matching `[A-Za-z0-9_-]{1,128}` or HTTPS board URL on `boards.greenhouse.io` / `job-boards.greenhouse.io` with a single token path. Reject arbitrary hosts, credentials, ports, extra paths and unsupported providers; token input handles boards not covered by the URL parser. Catalog IDs and private IDs follow JDM-002. API derives `sub` from JWT, writes sources/subscriptions (DB-I04), and authorizes catalog access or private-source ownership. Refresh persists `nextPollAt=now` subject to cooldown before best-effort queue send, so dispatcher recovers failed sends. Deletion disables future work; unsubscribe does not delete historical matches. 400 invalid source, 404 missing/not owned, 409 duplicate, 429 cooldown. Returns source state and `lastSuccessAt`/`lastErrorCode`; errors contain no resume data. Subscription creation takes effect by the next successful poll.
-Accepted by: —; awaiting Graham and Luke review of final contract.
+Contract: Shared source validation accepts a token matching `[A-Za-z0-9_-]{1,128}` or HTTPS board URL on `boards.greenhouse.io` / `job-boards.greenhouse.io` with a single token path. Reject arbitrary hosts, credentials, ports, extra paths and unsupported providers; token input handles boards not covered by the URL parser. Catalog/private IDs follow Accepted JDM-009; this overrides the old JDM-002 spellings. API derives `sub` from JWT, writes sources/subscriptions (DB-I04), and authorizes catalog access or private-source ownership. Refresh persists `nextPollAt=now` subject to cooldown before best-effort queue send, so dispatcher recovers failed sends. Deletion disables future work; unsubscribe does not delete historical matches. 400 invalid source, 404 missing/not owned, 409 duplicate, 429 cooldown. Returns source state and `lastSuccessAt`/`lastErrorCode`; errors contain no resume data. Subscription creation takes effect by the next successful poll.
+Accepted by: Luke Campbell (2026-11-18, provider). Waiting for: Graham Cohick (consumer), including JDM-009 ID format.
 
 #### JDM-I02: Internal work queues
 Status: Proposed
@@ -150,27 +182,39 @@ Contract: UTF-8 JSON with `schemaVersion: 1`. Scrape payload `{sourceId, request
 Accepted by: —
 
 #### JDM-I03: Render request
-Status: Proposed
+Status: Accepted
 Consumers: delivery
-Contract: `schemaVersion:1`, `sub`, `postingKey`, `docId`, `requestId`, `generation`, `reason` (`new_match` or `regenerate`), `rankedExperiences:[{roleId,score,rankedBullets:[{bulletId,score}]}]`, `rankedProjects:[{projectId,score,rankedBullets:[{bulletId,score}]}]`, `skills:[{category,score,rankedSkills:[skillId]}]`. Scores use JDM-005. Education and allowed unranked sections come from EB-I03. No rewritten text. Serialize at most 200 KiB (an application limit); oversized output fails visibly. Same work retry sends byte-equivalent stored payload. Delivery uses generation and request ID for conditional ownership and deduplication, preserves old PDFs, and suppresses regeneration email. Final schema/digest keys need Ryan and database agreement.
-Accepted by: Ryan Fusco (2026-11-18, consumer: delivery, recorded as DEL-017). Waiting for: Luke Campbell (provider).
+Contract: `schemaVersion:1`, `sub`, `postingKey`, `docId`, `requestId`, `generation`, `reason` (`new_match` or `regenerate`), `rankedExperiences:[{roleId,score,rankedBullets:[{bulletId,score}]}]`, `rankedProjects:[{projectId,score,rankedBullets:[{bulletId,score}]}]`, `skills:[{category,score,rankedSkills:[skillId]}]`. Scores use JDM-005. Education and allowed unranked sections come from EB-I03. No rewritten text. Serialize at most 200 KiB (an application limit); oversized output fails visibly. Same work retry sends byte-equivalent stored payload. Delivery uses generation and request ID for conditional ownership and deduplication, preserves old PDFs, and suppresses regeneration email. Producer and delivery consumer agree this payload; shared DB schema approval remains separate.
+Accepted by: Ryan Fusco (2026-11-18, consumer: delivery, recorded as DEL-017). Accepted by: Luke Campbell (2026-11-18, provider).
 
 #### JDM-I04: Shared Bedrock budget reservation
-Status: Proposed
+Status: Accepted (provider and parser consumer; shared storage/provisioning approval remains separate)
 Consumers: experience-bank, Matcher; database and build-and-operation
 Contract: `reserve(sub, attemptId, upperBoundMicroUsd, nowUtc)` returns `reserved`, `already_reserved` (not permission to invoke again), `deferred(nextAttemptAt)`, or `blocked_configuration`. Transaction writes one unique reservation and increments three counters only if all caps permit it. Counter window identifiers are UTC and unambiguous (`HOUR#...`, `DAY#...`). Retry of the transaction with the same attempt cannot double charge; a new actual invocation needs a new attempt ID. Counters/reservations remain at least seven days beyond the window. Crash/timeout after reserving may waste allowance but never release uncertain spend. Caller logs actual tokens and estimated cost separately without logging bank/job content. See JDM-006 and DB-I04.
-Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-017). Waiting for: Luke Campbell (provider). Shared database and build-and-operation parts follow DB-I04 and OPS-I05.
+Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-017). Accepted by: Luke Campbell (2026-11-18, provider). Shared database and build-and-operation parts follow DB-I04 and OPS-I05.
+
+#### JDM-I05: Regeneration command intake
+Status: Proposed
+Consumers: web-app-and-api (command producer), JDM dispatcher/Matcher; experience-bank (status provider), database
+Contract:
+- Reuse USER#{sub}/WORK#{workId}; workType distinguishes upload_regenerate, per_match_regenerate and existing new_match work. API gets sub from the authenticated token. Store requestId, requestedAt, reason=regenerate, state, and targetDocId or postingKey as applicable. JDM owns state transitions after creation.
+- Upload workId is regen-upload:{docId}; targetDocId is fixed. Write conditionally only for regenerate=true. The dispatcher reads the package’s per-upload status and current bank. Only successful parsed/parsed-with-unclassified targetDocId equal to the current bank may fan out. Failed or superseded uploads finish without regenerating; an upload never completed expires as failed upload_not_completed after 24 hours. No inference from a previous bank’s success. Ryan must expose per-upload status keyed by sub/docId through EB-I03; no direct DOC# reads.
+- Fanout selects active/unexpired/unapplied matches under JDM-007. Child work IDs derive deterministically from parent requestId and postingKey; store a continuation cursor so retries cannot lose later pages. Recheck targetDocId before each child starts; if replaced again, skip that old command. Regeneration never creates a new digest mark or email.
+- Per-match requests require an Idempotency-Key (UUID), used as requestId under the authenticated sub and postingKey. Atomically create work and claim the match’s activeRegenerationRequestId. Repeating the same key for the same match returns the same 202/requestId; another key while active returns 409; a key reused with a different target returns 409. Missing/invalid key returns 400. Ownership failure returns 404. This HTTP addition needs Graham’s agreement.
+- After commit, best-effort enqueue JDM-I02 {sub,workId}; persisted pending work is the source of truth if enqueue fails. Generation is allocated atomically when the operation is admitted; retries reuse it. Clear an active request only with a conditional requestId/generation check on terminal completion/failure. Pending render handoff must not release it prematurely.
+Accepted by: Luke Campbell (2026-11-18, JDM side). Waiting for: Graham Cohick, Ryan Fusco; shared DB/OPS contracts remain Proposed.
 
 ### Consumes
 
-- EB-I02 term resolver and EB-I03 bank package; use `get_bank`, resolve and dictionary version; never read bank items directly. Proposed interfaces still need provider acceptance.
+- EB-I03 bank package: use `get_bank`, never read bank items directly. Luke accepts this consumer contract (JDM-008). EB-I02/term dictionaries are deferred in v1; provider/other-consumer signoff on EB-I03 remains separate.
 - DB-I01 table conventions, DB-I03 delivery fields and DB-I04 discovery/work/cost schema. JDM proposes replacing LSI1 with a matches-by-date GSI; existing shared conventions remain pending agreement.
 - OPS-I01 to OPS-I04 deployment, storage, permissions and metrics; proposed amended intake OPS-I05.
-- API-owned settings, authenticated commands and upload-completion/regeneration signal: JDM-Q01 asks Graham for the producer contract. No invented WEB task IDs.
+- API-owned settings, authenticated commands and upload-completion/regeneration signal: JDM-Q01 asks Graham for the producer contract. Use existing WEB-T07 and WEB-T10; JDM-I05 is the proposed regeneration intake.
 
 ## Open Questions
 
-- **JDM-Q01:** Graham: agree JDM-I01, settings (`titleIncludes`, `titleExcludes`, `locationIncludes`, `deliveryMode`), and durable regeneration command producer contract. Upload regeneration must wait for successful bank replacement; per-match commands must authorize `sub` and use an idempotent request ID. Blocks JDM-T03/T07/T09; API implementation task IDs do not exist yet.
+- **JDM-Q01:** Graham: agree JDM-I01, settings (`titleIncludes`, `titleExcludes`, `locationIncludes`, `deliveryMode`), and durable regeneration command producer contract. Upload regeneration must wait for successful bank replacement; per-match commands must authorize `sub` and use an idempotent request ID. Blocks JDM-T03/T07/T09; API task IDs now exist: WEB-T07 and WEB-T10.
+  - **Luke’s answers (2026-11-18 restoration):** WEB-Q04/06 are answered by JDM-009; DB-I05 has Luke’s acceptance; WEB-Q03 has a concrete proposed contract in JDM-010/I05, awaiting Graham/Ryan.
   - **Graham Cohick's answers so far (2026-11-18):** the four settings, their limits, and their defaults are proposed in DB-I05. The endpoints are decided in WEB-001. Still open on his side: JDM-I01 (waiting on source ID format, WEB-Q04) and the regeneration producer contract (WEB-Q03).
 - **JDM-Q02:** Ryan: agree JDM-I03 generation/deduplication contract, EB-I02/03 usage, and JDM-I04 parser cost reservations. Confirm how SES send/record failures are reconciled: an SQS/digest conditional write alone cannot guarantee exactly-once external email. Blocks JDM-T06/T08/T09 and full duplicate-email demo signoff. Provider implementation task IDs do not exist yet.
   - **Ryan Fusco's answers (2026-11-18):**
@@ -180,7 +224,8 @@ Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-0
     - Emails are sent **at most once** (DEL-018).
     - The term resolver (EB-I02, EB-007) is deferred, so the Matcher doesn't depend on it in v1.
     - Separately, Ryan recommends a URL-safe `postingKey` separator (DEL-Q15).
-    - Still open: the digest index keys (DB-Q09).
+    - Digest index keys are now supplied by DEL-020; Luke agrees under JDM-007. Shared DB approval remains pending.
+  - **Luke’s answer (2026-11-18):** JDM-I03/I04 and DEL-Q13/15 resolved by JDM-006/007/008. EB-I03 accepted as consumer; EB-I02 deferred. JDM-Q02 no longer waits for Luke’s design answer. Provider implementation task IDs and overall EB/DB contract signoff remain outstanding.
 - **JDM-Q03:** Group: accept DB-I04 and OPS-I05, including GSI instead of LSI1 and dispatcher scan tradeoff; attach DB/OPS task IDs when written. Blocks integration/deploy, not completion of this planning draft.
 - **JDM-Q04 (risk, raised by Ryan Fusco as contributor, 2026-11-18): Is there a simpler fallback if time runs short?** No action is needed now. This is a watch item.
   - **The concern:** the project is due in about a month. This design includes:
@@ -196,11 +241,11 @@ Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-0
     - Cut the work states down to about four: pending, deferred, done, and failed.
   - Owner: Luke Campbell
   - Blocks: nothing yet
-- **SYS-Q04 (defined in architecture/AGENTS.md):** Group confirmation of Greenhouse-only shared goals and demo. Requested product scope is settled by Luke; group-owned document signoff remains outstanding.
+- **SYS-Q04 (defined in architecture/AGENTS.md):** all three owners now agree; shared RFC wording updated in this restoration.
 
 ### Planning exit check (2026-11-18)
 - Scope and review drafted; frozen baseline preserved.
-- Major recommendations have rationale; only explicit Greenhouse scope is Accepted.
+- JDM-001/006/007/008/009 are Accepted; JDM-I03/I04 have producer/consumer agreement. JDM-010/I05 regeneration intake and remaining shared approvals are explicitly Proposed.
 - Interfaces drafted on provider side with requests to consumers; shared acceptances outstanding.
 - Ordered implementation plan exists; blocked tasks name unresolved contracts.
 - Current diagram includes proposals with dashed borders.
@@ -208,29 +253,13 @@ Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-0
 
 ## Requests From Other Areas
 
-Update 2026-11-18: recommended answers now appear in JDM-003 to JDM-007, DB-I04 and OPS-I05. These original pointers remain until affected owners agree; they are no longer unanswered design work. SYS-Q01/02 shared ownership and SYS-Q03 ingestion placement are recommended, not recorded as group acceptance.
+Update 2026-11-18: recommended answers now appear in JDM-003 to JDM-007, DB-I04 and OPS-I05. Answered Luke-owned pointers were removed on 2026-11-18; outstanding requests below still need action. Luke’s SYS-Q01/02/03 confirmations are recorded at source; other owners’ approval remains separate.
 
 Pointers to items defined in other areas that this area's owner has to act on. Answer each one where it's defined, then delete its row (see "Coordinating Across Areas" in `planning/architecture/AGENTS.md`).
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| WEB-Q03 | `web-app-and-api/architecture.md` | With Ryan Fusco: agree where the "regenerate?" choice is stored, which area starts regeneration after a successful parse, and how the per-match regenerate request reaches the Matcher. Feeds JDM-Q01. |
-| WEB-Q04 | `web-app-and-api/architecture.md` | Use a URL-safe separator in source IDs (JDM-002), as DEL-Q15 asks for `postingKey`. |
-| WEB-T07, WEB-T10 | `web-app-and-api/implementation-plan.md` | The API task IDs that JDM-T03, JDM-T07, and JDM-T09 were waiting for now exist: WEB-T07 (sources, subscriptions, refresh) and WEB-T10 (regeneration requests). Link them from those tasks. |
-| DB-I05 | `database/architecture.md` | As a co-owner and reader, accept the Profile and Settings items: the four settings from JDM-Q01, their limits (20 terms of up to 60 characters per list), and the defaults (daily; title includes "intern"). |
-| WEB-Q06 | `web-app-and-api/architecture.md` | Say how the Matcher compares a filter term with a title: does `intern` match "Internship"? |
-| SYS-Q01 | `architecture/AGENTS.md` | Confirm shared ownership of `build-and-operation`, with Ryan Fusco coordinating. |
-| SYS-Q02 | `architecture/AGENTS.md` | Confirm shared ownership of `database`, with Ryan Fusco coordinating. |
-| SYS-Q03 | `architecture/AGENTS.md` | Group: confirm which Terraform module holds each area's resources, including whether the Matcher sits in `ingestion` or `resumes`. |
-| DEL-Q13 | `delivery/architecture.md` | Accept the Matcher's side of three decisions: DEL-010 (the render message, with ranked experiences, projects, and skills by category; scores comparable across entries), DEL-011 (marking matches for the next digest), and DEL-014 (re-ranking matches when a student regenerates). |
-| EB-I03 | `experience-bank/architecture.md` | Accept the experience-bank package as the Matcher's way to read the bank. Unclassified items are excluded (EB-013). |
-| DB-Q01 | `database/architecture.md` | Propose the attributes of Subscription, Match, Source, Posting, and Cost counter items. |
-| DB-Q03 | `database/architecture.md` | Decide with Graham Cohick who writes Subscription items and private Source items. |
-| DB-Q05 | `database/architecture.md` | Copy the posting details onto each match when creating it. Matches never expire, but postings do (DEL-007). |
+| WEB-Q03 | `web-app-and-api/architecture.md` | Luke answered with JDM-010/I05. Await Graham/Ryan’s agreement to API idempotency and per-upload bank status; no further Luke design answer pending. |
 | DB-I01 to DB-I03 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the match delivery state. The Matcher writes the digest mark. |
-| DEL-020 | `delivery/architecture.md` | When creating a match for an hourly or daily student, set the GSI2 bucket for the next send window (hourly at the top of the UTC hour, daily at 13:00 UTC). |
-| DEL-Q15 | `delivery/architecture.md` | Consider changing the `postingKey` separator to `.` (`gh.{boardToken}.{jobPostId}`), so keys are safe in S3 paths and signed URLs. |
-| OPS-002, OPS-010 | `build-and-operation/architecture.md` | Decide what the Matcher does when a cost cap is reached (hourly per-user, hourly platform, or daily platform). For example, defer the ranking until the cap resets. |
-| OPS-Q07 | `build-and-operation/architecture.md` | Confirm this area's row in the Requirements Intake. |
 | OPS-001 to OPS-007, OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept or challenge Ryan Fusco's answers: the state lock, the hourly caps, the image split, CI, the Bedrock model and region (OPS-006 sets a separate model for each Matcher task), and the repo layout. Also accept the four contracts. |
 | OPS-008 to OPS-010 | `build-and-operation/architecture.md` | As a co-owner, accept staying in the SES sandbox, the $50 monthly budget alert, and the $1.50 daily Bedrock cap. |

@@ -160,17 +160,17 @@ Contract:
 - **Source:** `PK=SOURCE#{sourceId}, SK=META`; `itemType=Source`, `provider=greenhouse`, `boardToken`, `visibility=catalog|private`, `ownerSub` (private only), `displayName`, `enabled`, `nextPollAt`, `refreshAllowedAt`, `leaseUntil`, `leaseGeneration`, `lastSuccessAt`, `lastErrorCode`, timestamps. Catalog seed writes catalog configuration; API writes private configuration; dispatcher/scraper only update operational fields. Catalog GSI1 keys `CATALOG` / `SOURCE#{sourceId}`; private sources GSI1 keys `USER#{sub}#SOURCES` / `SOURCE#{sourceId}`. Private ownership checked on the base record.
 - **Subscription:** `PK=USER#{sub}, SK=SUB#{sourceId}`; `itemType=Subscription`, `sourceId`, `createdAt`; GSI1 keys `SOURCE#{sourceId}#SUBSCRIBERS` / `USER#{sub}`. API writes; Matcher reads and confirms authoritative membership after GSI lookup. Duplicate creation is conditional; deletion is idempotent. JDM-I01 owns validation semantics.
 - **Posting:** `PK=POSTING#{postingKey}, SK=META`; `itemType=Posting`, `provider`, `boardToken`, string `jobPostId`, title, company display name from source metadata, location, plain-text description, HTTPS apply URL, `firstSeenAt`, `lastSeenAt`, `providerUpdatedAt` if supplied, `active`, `expiresAt` (epoch seconds). GSI1 keys `BOARD#{boardToken}#POSTINGS` / `POSTING#{postingKey}` enable complete-board reconciliation. No user source membership is stored in this public item. Reader checks active/expiry, independently of TTL.
-- **Match core:** existing `USER#{sub}` / `MATCH#{postingKey}`; `itemType=Match`, `postingKey`, immutable `postingSnapshot` (title/company/location/apply URL/plain-text description), `createdAt`, `docId`, `requestId`, `generation`, `deliveryMode`, `rankingVersion`, `dictionaryVersion`. JDM owns core/ranking fields, delivery owns DB-I03 fields, API owns `appliedAt`. Atomic conditional creation includes digest mark for new hourly/daily matches. Snapshot over 128 KiB UTF-8 fails visibly; serialize every item below an application ceiling of 300 KiB, leaving room for delivery fields. Unbounded PDF history must become separate history records, not an ever-growing array (DB-Q08).
+- **Match core:** existing `USER#{sub}` / `MATCH#{postingKey}`; `itemType=Match`, `postingKey`, immutable `postingSnapshot` (title/company/location/apply URL/plain-text description), `createdAt`, `docId`, `requestId`, `generation`, `deliveryMode`, `rankingVersion` (dictionaryVersion deferred with EB-I02). JDM owns core/ranking fields, delivery owns DB-I03 fields, API owns `appliedAt`. Atomic conditional creation includes digest mark for new hourly/daily matches. Snapshot over 128 KiB UTF-8 fails visibly; serialize every item below an application ceiling of 300 KiB, leaving room for delivery fields. PDF history is listed from the S3 match folder (DEL-009, JDM-008); no pdfHistory array or separate history items (DB-Q08).
 - **Work:** `PK=USER#{sub}, SK=WORK#{workId}`; `itemType=Work`, `postingKey`, `sourceId`, `reason`, `requestId`, `generation`, `docId`, `state`, `nextAttemptAt`, `leaseOwner`, `leaseUntil`, `leaseGeneration`, `attemptCount`, `createdAt`, `errorCode`, persisted `renderPayload` (maximum 200 KiB), and `rankingVersion`. States: pending, waiting_bank, deferred_budget, ranking, render_pending, complete, failed, blocked_configuration. Pending work has no TTL; terminal records retained for deduplication while matches remain. Claims/commits check fencing generation; stale workers cannot mutate current match generations. Pending work and match creation are transactionally consistent per JDM-004. Work stores a posting reference before match creation; an expired/closed posting can terminate unmatched work visibly.
 - **Dispatcher checkpoint:** `PK=SYSTEM#JDM, SK=DISPATCH#{passType}`; `itemType=DispatchCheckpoint`, serialized `lastEvaluatedKey`, pass start time, lease owner/expiry/generation. Dispatcher updates conditionally; crash resumes or safely restarts the pass.
 - **Cost counters:** `PK=COST#HOUR#{UTC-hour}, SK=META`; `PK=COST#DAY#{UTC-date}, SK=META`; per-user `PK=USER#{sub}, SK=COST#HOUR#{UTC-hour}`. `itemType=CostCounter`, integer `reservedMicroUsd`, window start/end, expiry at least seven days after window. Both parser and Matcher use JDM-I04; neither bypasses it.
 - **Reservation:** `PK=USER#{sub}, SK=COSTRES#{attemptId}`; `itemType=CostReservation`, upper bound, caller, model/pricing version, window IDs, createdAt, expiry. A single transaction conditionally creates it and increments all three counters within caps. Separate invocations require separate attempt IDs. Unknown outcome consumes reservation conservatively.
 - **Matches newest first (DB-Q02):** propose a GSI3 instead of LSI1: `GSI3PK=USER#{sub}#MATCHES`, `GSI3SK={createdAt}#{postingKey}`. Keep the stable match primary key for deduplication. Projection contains keys/basic feed fields; details come from base reads. Feed is eventually consistent; return newly created match directly where immediate visibility is required.
-- **Digest index:** preserve DB-I03 ownership, but exact GSI2 partition/sort keys, bucketing and schedule timezone remain a shared agreement (DB-Q09); implementation remains blocked until defined. *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
+- **Digest index:** preserve DB-I03 ownership, but GSI2 keys and timing are defined by DB-I03/DEL-020 and agreed by Luke under JDM-007; overall shared schema approval remains pending (DB-Q09). *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
 Accepted by: —. DB-I01/02/03 remain Proposed; this supplements rather than silently accepts them.
 
 #### DB-I05: Profile and Settings items
-Status: Proposed. Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell (shared area).
+Status: Proposed. Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009). Waiting for: Ryan Fusco (shared area).
 Written by: web-app-and-api
 Consumers: delivery (the email address and delivery mode), job-discovery-and-matching (the filters and delivery mode)
 Contract:
@@ -188,29 +188,37 @@ Contract:
 - **Timestamps** are ISO 8601 in UTC.
 
 Why the default title filter: empty filters mean no restriction (JDM-005), so a new student who subscribes to a large board would otherwise trigger a ranking call for every posting on it. Whether `intern` also matches "Internship" depends on how the Matcher compares terms (WEB-Q06).
-Accepted by: Graham Cohick (2026-11-18). Waiting for: Ryan Fusco, Luke Campbell.
+Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009). Waiting for: Ryan Fusco.
+
+**Pending regeneration amendment (JDM-I05):** add workType, targetDocId, requestedAt, fanout cursor and per-match request idempotency/active-request fields to DB-I04 only after Graham/Ryan agree. API conditionally creates command records, JDM transitions them. Existing DB-I04 is not silently accepted by this proposal.
 
 ### Consumes
 - **Provisioning of the table in each environment:** OPS-I02 from `build-and-operation`.
 
 ## Open Questions
 
+**Luke’s answers to DB-Q08/09 (2026-11-18):** accept S3-folder PDF history (DEL-009) and next-window digest keys/timing (DEL-020), per JDM-007/008. These no longer wait on Luke; shared DB contracts still need all owners.
+
 Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB-Q02 GSI3; DB-Q03 API configuration writes/JDM operational writes; DB-Q05 immutable bounded snapshot; DB-Q07 transactional counters and unique reservations (Ryan Fusco agrees, 2026-11-18: EB-017). Ryan and Graham still need to agree. New questions: **DB-Q08** (Ryan/Luke): replace unbounded DB-I03 `pdfHistory` with child records before delivery implementation. *Ryan Fusco's answer (2026-11-18): drop `pdfHistory` entirely; history is the S3 folder `resume/{sub}/{postingKey}/` (DEL-009). DB-I03 is updated above, Proposed until every owner accepts.* **DB-Q09** (Ryan/Luke): define digest GSI2 keys and timing before JDM-T07. *Ryan Fusco's answer (2026-11-18): DEL-020.* Both block final DB-I04 acceptance.
 
 - **DB-Q01: What attributes do the remaining item types have?** That's Profile, Settings, Subscription, Match (apart from the delivery state), Source, Posting, and Cost counter. The owner of the area that writes each type needs to propose them.
+  - **Luke’s answer (2026-11-18):** Luke’s discovery-owned attributes are supplied in DB-I04. Profile/Settings remain Graham’s responsibility. Keeping the definitions together avoids competing schemas.
   - *Graham Cohick's answer for Profile and Settings (2026-11-18): DB-I05, Proposed until every owner accepts it. Luke Campbell's proposal for the other types is DB-I04.*
   - Owner: Graham Cohick (Profile, Settings), Luke Campbell (Subscription, Match, Source, Posting, Cost counter)
   - Blocks: DB-I01 acceptance, delivery's use of postings and settings
 - **DB-Q02: LSI1 has to be decided before the first deploy.** *Proposed answer: GSI3 (DB-I04). Luke Campbell proposed it and Ryan Fusco agrees (2026-11-18). Graham Cohick agrees (2026-11-18), so every owner agrees: the table has GSI3 and no local secondary index. DB-I01 and DB-I04, which define GSI3, stay Proposed until every owner accepts them as a whole.* A local secondary index can only be created along with the table. It also limits each user's partition to 10 GB, and every user's data lives in one partition. The alternatives are a GSI, or sorting matches by an `SK` that includes the date.
+  - **Luke’s answer (2026-11-18):** Agree GSI3 and no LSI1: stable primary keys preserve deduplication, while a separate date index serves the feed. Graham already agreed to GSI3 (2026-11-18); full shared-schema approval remains separate.
   - Owner: Ryan Fusco, Luke Campbell
   - Blocks: DB-I01, the first deploy of the `data` module
 - **DB-Q03: Who writes Subscription items, and Source items for private pages?** They're created through the API (`POST /subscriptions`, `POST /sources`), but `job-discovery-and-matching` owns the concept. *Proposed answer (Luke Campbell, DB-I04): `web-app-and-api` writes Subscription items and the configuration of private Source items, and `job-discovery-and-matching` updates only a source's polling fields. Graham Cohick agrees (2026-11-18). The attribute definitions in DB-I04 stay Proposed until every owner accepts them.*
+  - **Luke’s answer (2026-11-18):** API writes user source configuration and subscriptions; catalog seed writes catalog configuration; JDM writes poll state, postings and matches. The authenticated API already owns user commands, so another writer service is unnecessary. Graham already agreed to this write split (2026-11-18); the complete DB-I04 schema remains Proposed.
   - Owner: Graham Cohick, Luke Campbell
   - Blocks: Item Types
 - **DB-Q04: Which capacity mode should the table use?** Recommendation: on-demand. Traffic comes in bursts and is idle most of the day (RFC p.3), and on-demand needs no capacity planning before Phase 5.
   - Owner: Ryan Fusco
   - Blocks: DB-I01
 - **DB-Q05: Matches need their own copy of the posting details.** Postings expire 30 days after last seen, but matches and resumes never expire (DEL-007). A match has to stay viewable, and able to be re-ranked (DEL-014), after its posting is gone. Recommendation: when the Matcher creates a match, it copies the posting's title, company, location, apply link, and description onto the match item. That copy is never updated.
+  - **Luke’s answer (2026-11-18):** Agree immutable title/company/location/apply-link/description snapshot with the DB-I04 size bound. Historical matches and regeneration must work after posting expiry.
   - Owner: Luke Campbell (writes Match items), Ryan Fusco
   - Blocks: DEL-004 emails, the dashboard's match view, DEL-008
 - **DB-Q06: Where does the "applied" flag on a match live?** Regeneration skips matches the student has applied to (DEL-014). Recommendation: an `appliedAt` attribute on the match, set and cleared by `web-app-and-api` from the dashboard. *Graham Cohick accepts the recommendation (2026-11-18): `web-app-and-api` writes `appliedAt` (DB-AP14). Waiting for: Ryan Fusco to confirm.*
@@ -218,6 +226,7 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
   - Blocks: DEL-014
 
 - **DB-Q07: Per-user and daily cost counters.** OPS-002 and OPS-010 cap Bedrock spend at $1 per hour per user, $5 per hour for the platform, and $1.50 per day for the platform. The RFC only has one `COST#{hour}` counter. Recommendation:
+  - **Luke’s answer (2026-11-18):** Agree one transactional reservation across hourly user, hourly platform and daily platform counters using JDM-I04; both parser and Matcher use it. This prevents independent callers from overspending.
   - Keep `PK=COST#{hour}, SK=META` as the hourly platform total.
   - Add `PK=COST#{day}, SK=META` as the daily platform total.
   - Add `PK=USER#{sub}, SK=COST#{hour}` for each user.

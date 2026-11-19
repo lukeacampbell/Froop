@@ -328,6 +328,8 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 
 ## Open Questions
 
+**Luke’s answer to OPS-Q07 and Matcher cap handling (2026-11-18):** confirm the amended JDM intake in OPS-I05 (HTTP-only Greenhouse scraper, dispatcher/Matcher in ingestion, no Chromium, digest schedules owned by delivery). At any cost cap, persist deferred work and its next reset time, acknowledge SQS and resume via dispatcher, per Accepted JDM-006/I04. Oversized-per-cap requests are blocked configuration, not infinite retries. This avoids paid calls after budget exhaustion and queue retry storms. Other owners must still accept shared OPS-I05; this does not blanket-approve OPS-001 to OPS-010.
+
 Answered: OPS-Q11 (OPS-012), OPS-Q01 (OPS-001), OPS-Q02 (OPS-002), OPS-Q03 (OPS-003, OPS-004), OPS-Q04 (OPS-005), OPS-Q05 (OPS-008), OPS-Q06 (OPS-006), OPS-Q08 (OPS-007), OPS-Q09 (OPS-009), OPS-Q10 (OPS-010). Each answer is Proposed until every owner accepts it.
 
 - **OPS-Q07: Are the RFC-derived Requirements Intake rows right?** Luke Campbell and Graham Cohick need to confirm the rows for their areas.

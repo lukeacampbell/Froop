@@ -21,7 +21,7 @@ Last reviewed: 2026-11-18
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Updated for Luke’s Greenhouse-only planning request. |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Scope, review, seven decisions, interfaces, and remaining agreements drafted. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Scope, review, ten decisions, interfaces, and remaining agreements drafted. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Updated 2026-11-18 for Greenhouse-only scope and proposed recovery flow. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Drafted: JDM-T01 to JDM-T10, with acceptance criteria and explicit blockers. |
 

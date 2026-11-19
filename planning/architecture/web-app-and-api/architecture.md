@@ -399,6 +399,25 @@ Alternatives:
 Consequences:
 - The first request after an idle period is slow. The cold start is measured in Phase 5, and this decision is revisited if it misses a load target.
 
+### WEB-013: The API's side of regeneration
+Status: Accepted (Graham Cohick, 2026-11-19)
+Date: 2026-11-19
+Context: Answers the API's part of WEB-Q03, JDM-Q01, and DEL-Q12. Luke Campbell's JDM-010 and JDM-I05 define how regeneration reaches the Matcher, and Ryan Fusco's EB-019 stores the choice on the upload record. Graham Cohick accepted JDM-I05 as the command producer on 2026-11-19. This decision records what the API does.
+Decision:
+- **On upload:** `POST /uploads` calls `create_upload(sub, regenerate)` (EB-019). When `regenerate` is true, it then writes the upload-regeneration work record (JDM-I05) before it answers.
+- **If the work record can't be written,** the API answers with an error and returns no upload link. The student tries again. The unused upload record expires by itself (EB-019). The API never returns a link while silently dropping the choice.
+- **The work record is the trigger.** The API treats the `regenerate` value on the upload record as display only (WEB-Q08).
+- **Per match:** `POST /matches/{postingKey}/regenerate` requires an `Idempotency-Key` header holding a UUID, which becomes the request ID. The API creates the work record and claims the match's active request in one write, then sends the work on. The responses are those in JDM-I05: 202, 400, 404, or 409.
+- **Sending is best effort.** Once the work record is written the request is safe, because the dispatcher recovers work that was never sent (JDM-004).
+- **CORS** allows the `Idempotency-Key` header.
+Alternatives:
+- Return the upload link even if the work record fails. Rejected: the student would believe regeneration was coming.
+- Have the API generate the request ID. Rejected: a retry after a lost response would start a second ranking.
+Consequences:
+- The API writes Work items, so it needs that permission and permission to send to the match queue (OPS-Q07 row, updated).
+- DB-I04 needs its regeneration amendment (the work type, target, and active-request fields) before WEB-T10 can be built.
+- WEB-I01, WEB-T10, and WEB-T14 change to match.
+
 ### WEB-012: Account deletion is a non-goal for this version
 Status: Proposed. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Waiting for: Luke Campbell, because Non-Goals is a shared section of the RFC (SYS-Q05).
 Date: 2026-11-18
@@ -426,9 +445,9 @@ Contract: the endpoints in WEB-001, with these shapes. Parts marked *(pending)* 
   - IDs (`sourceId`, `postingKey`, `docId`) are opaque strings to the dashboard.
 - **`GET /me`** → `{profile: {email}, settings: {deliveryMode, titleIncludes, titleExcludes, locationIncludes}}`. Creates both on first use (WEB-003, DB-I05).
 - **`PUT /me`** takes the whole `settings` object and returns the same shape as `GET /me`. Invalid settings: 400 (WEB-008, DB-I05).
-- **`POST /uploads`** takes `{regenerate}` (boolean, default false) and returns `{docId, upload, expiresAt}`, where `upload` is what the browser needs to send the file straight to S3 *(pending WEB-Q01: PUT or POST; pending WEB-Q03: what happens to `regenerate`)*.
+- **`POST /uploads`** takes `{regenerate}` (boolean, default false) and returns `{docId, upload: {url, fields}, expiresAt}`. The browser sends the file to `url` as a multipart form with `fields`, a presigned POST that expires after 15 minutes and accepts one `.tex` file of up to 1 MB (EB-018, EB-019). When `regenerate` is true, the request is saved before the response is sent (WEB-013).
 - **`GET /experience`** → `{status, reason, docId, bank}`.
-  - `status` is `none`, `pending`, `parsed`, `parsed_with_unclassified`, or `failed` (EB-I03 `upload_status`), and `reason` is set when it failed *(pending WEB-Q02: when `pending` starts)*.
+  - `status` is `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`, or `expired` (EB-I03 `upload_status`, EB-019), and `reason` is set when it failed. It describes the student's latest upload, which may not be the bank shown: a new upload replaces the bank only once it parses.
   - `bank` is what EB-I03 `get_bank` returns: the header, then items grouped by section, each with `source` and `text`. It is absent when there is no bank.
 - **`DELETE /experience`** → 204. Deleting when there is no bank also returns 204.
 - **`GET /sources`** → `{catalog: [source], private: [source]}`, where a source is `{sourceId, displayName, boardToken, visibility, subscribed, lastSuccessAt, lastErrorCode}` (JDM-I01). `private` holds only the student's own.
@@ -441,9 +460,9 @@ Contract: the endpoints in WEB-001, with these shapes. Parts marked *(pending)* 
   - `posting` is the match's own copy of the posting (DB-Q05).
   - `resume` is `{generation, url, expiresAt}` when `renderStatus` is `rendered`, and null otherwise. `earlierResumes` is a list of the same shape (WEB-007, DEL-I01, DB-I03).
 - **`PUT /matches/{postingKey}/applied`** → `{appliedAt}`. Repeating it keeps the first time. **`DELETE`** → 204 (DB-Q06).
-- **`POST /matches/{postingKey}/regenerate`** → 202 with `{requestId}`. Already running for this match: 409 *(pending WEB-Q03)*.
+- **`POST /matches/{postingKey}/regenerate`** needs an `Idempotency-Key` header holding a UUID, and returns 202 with `{requestId}`. Missing or invalid key: 400. The same key again for the same match: the same 202 and `requestId`. A different key while one is running, or a key already used for another match: 409 (JDM-I05, WEB-013).
 
-Path formats for `sourceId` and `postingKey` are pending WEB-Q04 and DEL-Q15.
+In paths, `sourceId` is `gh.{boardToken}` or `private.{ownerKey}.gh.{boardToken}`, and `postingKey` is `gh.{boardToken}.{jobPostId}` (JDM-008, JDM-009). The dashboard still treats both as opaque.
 Accepted by: —
 
 #### WEB-I02: Student identity
@@ -458,19 +477,22 @@ Accepted by: —
 
 ### Consumes
 
-Accepted by this area as a consumer:
-- **The experience bank package:** EB-I03 from `experience-bank`. The API lists the bank, reads its upload status, and deletes it only through this package. Graham Cohick accepted it on 2026-11-18.
-- **Resume PDF objects:** DEL-I01 from `delivery`. The API signs links to them and lists a match's earlier resumes (WEB-007). Graham Cohick accepted it on 2026-11-18.
-- **Match delivery state:** DB-I03 in `database`. The dashboard shows `renderStatus`, `renderReason`, and `notifyStatus`, and the API reads `pdfKey` to sign links. Graham Cohick accepted it on 2026-11-18 as a co-owner.
-
-Used, but not accepted yet:
-- **The upload object contract:** EB-I01 from `experience-bank`. Held until WEB-Q01 (PUT or POST) is answered.
-- **Greenhouse sources, subscriptions, and refresh:** JDM-I01 from `job-discovery-and-matching`. Held until WEB-Q04 (source ID format) is answered.
-- **Regeneration requests to the Matcher:** not defined yet. JDM-Q01 asks this area for a producer contract, and WEB-Q03 asks who starts regeneration and where the choice is stored.
-- **Table conventions and the items this area reads or writes:** DB-I01 and DB-I04 in `database` (Subscription, Source, Match, and GSI1 and GSI3). This area writes Profile and Settings as defined in DB-I05, which it proposed.
-- **Deployment, storage, IAM and secrets, and observability:** OPS-I01 to OPS-I04 from `build-and-operation`. Held until this area's Requirements Intake row is agreed (OPS-Q07).
+Graham Cohick has accepted every contract this area uses. "Agreed" below means the other owners have too.
+- **The upload object contract:** EB-I01 from `experience-bank`, a presigned POST (EB-018). Accepted 2026-11-19. Agreed.
+- **The experience bank package:** EB-I03 from `experience-bank`. The API lists the bank, reads upload status, creates uploads, and deletes the bank only through it. Base contract accepted 2026-11-18 and agreed. The EB-019 extension (`create_upload`, the status list) accepted 2026-11-19; waiting for Luke Campbell.
+- **Greenhouse sources, subscriptions, and refresh:** JDM-I01 from `job-discovery-and-matching`, with the JDM-009 ID formats and filter matching. Accepted 2026-11-19. Agreed.
+- **Regeneration command intake:** JDM-I05 from `job-discovery-and-matching`. The API writes the work records and sends them on (WEB-013). Accepted 2026-11-19. Agreed, with one point to confirm (WEB-Q08).
+- **Resume PDF objects:** DEL-I01 from `delivery`. Accepted 2026-11-18. Agreed.
+- **Table conventions and items:** DB-I01, DB-I02, DB-I03, and DB-I04 in `database`, accepted as a co-owner (DB-I03 on 2026-11-18, the rest on 2026-11-19); each waits for Luke Campbell. DB-I05 (Profile and Settings), which this area proposed and writes, is Accepted by all three owners.
+- **Deployment, storage, IAM and secrets, observability, and the job-discovery resources:** OPS-I01 to OPS-I05 from `build-and-operation`, accepted as a co-owner on 2026-11-19. OPS-I01 to OPS-I04 wait for Ryan Fusco and Luke Campbell.
 
 ## Open Questions
+
+Answered: WEB-Q01 (EB-018; EB-I01 accepted), WEB-Q02 (EB-019; the EB-I03 extension accepted), WEB-Q03 (JDM-010 and JDM-I05 accepted; the API's side is WEB-013; WEB-Q08 follows from it), WEB-Q04 and WEB-Q06 (JDM-009; JDM-I01 accepted), WEB-Q07 (the task IDs are now in `implementation-plan.md`). Graham Cohick accepted each answer on 2026-11-19. The entries stay below as the record.
+
+- **WEB-Q08: Which record triggers upload regeneration?** The student's "regenerate?" choice is now stored twice. `create_upload(sub, regenerate)` puts it on the upload record (EB-019), and the API writes a `regen-upload:{docId}` work record when it is true (JDM-I05). EB-019 says the dispatcher reads the choice through `upload_status`, "one record, not two". JDM-I05 says the dispatcher works from the work record, which is the only one its recovery scan can find. The two writes aren't atomic, so they can disagree. Proposed (WEB-013): the work record is the trigger, and the value on the upload record is for display only. If that's right, EB-019's wording should say so. If the upload record is meant to be the trigger, JDM-I05 needs a way for the dispatcher to find it.
+  - Owner: Luke Campbell, Ryan Fusco
+  - Blocks: WEB-T10, and the regeneration amendment to DB-I04
 
 - **WEB-Q01: Can the upload be a presigned POST instead of a presigned PUT?** EB-I01 says "one object per presigned PUT" with a maximum size, but S3 enforces a size range only on a presigned POST (review item 4). Proposed: change EB-I01 to a presigned POST whose policy fixes the key, the content type, and the size range.
   - *Answered by Ryan Fusco (2026-11-19): yes, a presigned POST (EB-018). The policy fixes the key, `application/x-tex`, 1 byte to 1 MB, and a 15-minute expiry. EB-I01 is revised and accepted on the provider side.*
@@ -513,13 +535,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| DB-001 | `database/architecture.md` | As a co-owner, accept on-demand capacity for the table (answers DB-Q04). |
-| EB-I03 (EB-019 extension) | `experience-bank/architecture.md` | Accept `create_upload` and `upload_status(sub, docId)`, and the fixed status list, which answer WEB-Q01 and WEB-Q02. |
-| EB-I01 | `experience-bank/architecture.md` | Accept the revised upload contract (presigned POST, EB-018) as its consumer. |
-| EB-Q10 | `experience-bank/architecture.md` | Confirm the experience-bank wording in the RFC's Summary, Goal 3, and Demo step 1 (one LaTeX resume, verbatim bullets). |
-| EB-I01 | `experience-bank/architecture.md` | Accept the upload contract as its consumer: the key layout, `.tex` only, and the size limit. |
-| DEL-Q12 | `delivery/architecture.md` | The three endpoints are decided (WEB-001). Still needed: how the regenerate choice and request reach the Matcher (WEB-Q03). |
-| DB-I01, DB-I02, DB-I04 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the discovery, work, and cost records. Held until the open database questions settle. |
-| OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept the four contracts: deployment, storage, IAM and secrets, and observability. Held until this area's review confirms its Requirements Intake row (OPS-Q07). |
-| JDM-Q01, JDM-I01 | `job-discovery-and-matching/architecture.md` | Agree Greenhouse-only source input, API-owned source/subscription writes, settings filters and regeneration producer contract; update API diagram/help text. |
-| JDM-I01, JDM-I05 | `job-discovery-and-matching/architecture.md` | Luke answered source IDs/filter semantics and proposed regeneration intake. Agree final source format and regeneration API persistence/idempotency contract. |
+| _None yet._ | | |

@@ -253,7 +253,7 @@ Contract:
 - **Config:** comes from environment variables that Terraform sets: table name, bucket names, queue URLs, and the secret ARN.
 - **Environments:** pushes to `main` deploy to dev automatically. Prod deploys only when started by hand.
 - **Area resources:** each area's Lambdas, queues, roles, and alarms live in that area's Terraform module (SYS-Q03).
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
 
 #### OPS-I02: Storage resources
 Status: Proposed
@@ -266,13 +266,13 @@ Contract:
   - static site: served through CloudFront
 
   Each area owns the key layout of its own prefix (EB-I01, DEL-I01).
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
 
 #### OPS-I03: IAM and secrets
 Status: Proposed
 Consumers: all areas
 Contract: Each Lambda has its own role, granted only the permissions its area lists in the Requirements Intake. The only secret is the CloudFront signing key, stored in Secrets Manager and readable only by `api` and `notifier`. Job boards need no keys, and nothing is stored in git or in GitHub secrets.
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
 
 #### OPS-I04: Observability conventions
 Status: Proposed
@@ -294,7 +294,7 @@ Contract:
   - SES bounces
 
   All alarms go to SNS, which emails the team.
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
 
 #### OPS-I05: Amended JDM Requirements Intake
 Status: Proposed
@@ -306,7 +306,7 @@ Contract:
 - Config: table and queue names, poll/cooldown/lease limits, HTTP/response limits, ranking token limits/model ID/pricing version, cost caps, and work recovery page limits. No hardcoded model prices.
 - Metrics/alarms: poll failures, DLQ depth, oldest pending work, budget deferral, invalid model output and estimated/actual AI cost; retain JSON correlation IDs without resume text, job bodies or raw prompts.
 - Provision GSI3 and work/reservation schemas only after DB-I04 acceptance. Keep GSI1/GSI2; proposed LSI1 removal requires DB agreement before table deployment.
-Accepted by: Ryan Fusco (2026-11-19). Waiting for: Graham Cohick (shared area).
+Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Proposed by Luke Campbell, so every owner has now agreed; the Status line is the coordinator's to update.
 
 ### Consumes
 - **The table design:** DB-I01 from `database`.
@@ -318,7 +318,7 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 
 | Area | Need | Source | Status |
 |---|---|---|---|
-| web-app-and-api | **Sign-in:** Cognito user pool, hosted UI, and a public app client using the code flow with PKCE (WEB-002); the self sign-up switch and callback URLs as variables for each environment (WEB-004). **API:** API Gateway HTTP API with a JWT authorizer, CORS origins as a variable for each environment (WEB-010), and throttling values; the `api` image with no function URL (WEB-005) and a timeout under 30 seconds (WEB-011). **Table:** read and write on Profile, Settings, Subscription, and private Source items, `appliedAt` on matches, and queries on GSI1 and GSI3 (DB-I05, DB-I04). **Buckets:** write to `uploads/` for upload links, delete through the bank package (EB-I03), and list `resume/` (WEB-007). **Queues:** send a refresh request (JDM-I01); a regeneration request is pending WEB-Q03. **CloudFront:** the static site, and `resume/` behind signed URLs, with read access to the signing key. **Alarms:** API Lambda errors and latency, with the API 5xx alarm. **CI:** the dashboard build and publish step (OPS-012). | RFC p.3–4, 7; WEB-001 to WEB-011; `web-app-and-api` review item 17 | Proposed (revised 2026-11-18; confirmed by Graham Cohick, OPS-Q07) |
+| web-app-and-api | **Sign-in:** Cognito user pool, hosted UI, and a public app client using the code flow with PKCE (WEB-002); the self sign-up switch and callback URLs as variables for each environment (WEB-004). **API:** API Gateway HTTP API with a JWT authorizer, CORS origins as a variable for each environment (WEB-010), and throttling values; the `api` image with no function URL (WEB-005) and a timeout under 30 seconds (WEB-011). **Table:** read and write on Profile, Settings, Subscription, and private Source items, `appliedAt` on matches, and queries on GSI1 and GSI3 (DB-I05, DB-I04). **Buckets:** write to `uploads/` for upload links, with the uploads bucket allowing a browser POST from the dashboard's origin (EB-018), delete through the bank package (EB-I03), and list `resume/` (WEB-007). **Queues:** send a refresh request (JDM-I01), and send regeneration work to the match queue after writing its Work record (JDM-I05, WEB-013). **CloudFront:** the static site, and `resume/` behind signed URLs, with read access to the signing key. **Alarms:** API Lambda errors and latency, with the API 5xx alarm. **CI:** the dashboard build and publish step (OPS-012). | RFC p.3–4, 7; WEB-001 to WEB-011; `web-app-and-api` review item 17 | Proposed (revised 2026-11-18; confirmed by Graham Cohick, OPS-Q07) |
 | experience-bank | Uploads bucket that accepts only `.tex` through a presigned POST (EB-018: content type, 1 byte to 1 MB, 15-minute expiry; POST allowed from the dashboard's origin), with event notifications to the Bank parser; parser Lambda (small: a Python LaTeX parser, with no OCR and no TeX install, EB-001, EB-009); Bedrock invoke permission; budget reservations through the shared package (JDM-I04, EB-017); table access for experience items | RFC p.3, 5; EB-I01; EB-017; EB-018 | Proposed |
 | job-discovery-and-matching | One dispatcher tick; HTTP-only Greenhouse scraper; Matcher; scrape/match/render queues and DLQs; durable recovery and cost reservations; seed catalog. Digest schedules stay with delivery. See OPS-I05 for permissions/configuration. | JDM-001 to JDM-007, OPS-011 | Proposed amendment; replaces RFC-derived JDM intake |
 | delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES at most once, DEL-004, DEL-018); hourly and daily digest schedules that trigger the Notifier (DEL-019); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |

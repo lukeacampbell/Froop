@@ -47,6 +47,7 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-19 | EB-009 and DEL-002: Uploaded LaTeX is never run as code | Security |
 | 2026-11-19 | EB-016: Label each section by category | Data Model |
 | 2026-11-19 | EB-018: Uploads use a presigned POST | Data Model (S3), API |
+| 2026-11-19 | WEB-013: The API's side of regeneration | API |
 | 2026-11-19 | EB-019: The package creates the upload record, and an unused link expires | Data Model, API |
 | 2026-11-19 | DB-I05: Profile and Settings items (accepted by every owner) | Data Model |
 
@@ -173,7 +174,7 @@ Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers 
 | GET | /health | no | Health check |
 | GET | /me | yes | Get profile and settings. The first call creates them, with default settings. |
 | PUT | /me | yes | Replace settings (delivery mode, filters). Invalid settings are rejected. |
-| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice on the upload record (EB-019) *(pending WEB-Q03: how the choice reaches the Matcher)* |
+| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice on the upload record (EB-019) When the student opts in, the request is saved before the link is returned (WEB-013). |
 | GET | /experience | yes | List the experience bank, with the upload's status (EB-019) |
 | DELETE | /experience | yes | Delete the experience bank and the uploaded file |
 | GET | /sources | yes | List catalog sources and the user's private sources |
@@ -186,7 +187,7 @@ Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers 
 | GET | /matches/{postingKey} | yes | Get one match with its delivery state, a signed link to its current resume, and its earlier resumes |
 | PUT | /matches/{postingKey}/applied | yes | Mark a match as applied |
 | DELETE | /matches/{postingKey}/applied | yes | Unmark it |
-| POST | /matches/{postingKey}/regenerate | yes | Regenerate the resume for one match *(pending WEB-Q03)* |
+| POST | /matches/{postingKey}/regenerate | yes | Regenerate the resume for one match. Needs an `Idempotency-Key` header, so a retry doesn't rank twice (WEB-013). |
 
 Errors:
 - **401:** missing or invalid token, rejected by API Gateway

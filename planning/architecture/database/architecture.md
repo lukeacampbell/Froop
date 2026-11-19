@@ -57,7 +57,7 @@ _None yet._
 ## Decisions
 
 ### DB-001: The table uses on-demand capacity
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-19). Waiting for: Graham Cohick, Luke Campbell (shared area).
+Status: Proposed. Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Waiting for: Luke Campbell (shared area).
 Date: 2026-11-19
 Context: Answers DB-Q04. Traffic comes in bursts (scrapes, digests, uploads) and the table is idle most of the day (RFC p.3).
 Decision: The table and its three GSIs use DynamoDB on-demand capacity in every environment.
@@ -128,7 +128,7 @@ Contract:
 - **TTL:** postings expire 30 days after they were last seen.
 
 Every item carries an item-type attribute. A new item type needs a new row in Item Types before anything writes it.
-Accepted by: Ryan Fusco (2026-11-19). Waiting for: Graham Cohick, Luke Campbell.
+Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Waiting for: Luke Campbell.
 
 #### DB-I02: Experience items
 Status: Proposed
@@ -146,7 +146,7 @@ Contract: Item types under `PK=USER#{sub}`, `SK=DOC#…`:
 - **Current-upload pointer:** a per-user item naming the current `docId` (EB-008, Proposed).
 
 The exact sort-key formats follow DB-I01. `source` and `text` are never modified after they're written. A new upload replaces the whole set (EB-002).
-Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank). Waiting for: Graham Cohick, Luke Campbell.
+Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank), Graham Cohick (2026-11-19). Waiting for: Luke Campbell.
 
 #### DB-I03: Match delivery state
 Status: Proposed
@@ -177,7 +177,7 @@ Contract:
 - **Reservation:** `PK=USER#{sub}, SK=COSTRES#{attemptId}`; `itemType=CostReservation`, upper bound, caller, model/pricing version, window IDs, createdAt, expiry. A single transaction conditionally creates it and increments all three counters within caps. Separate invocations require separate attempt IDs. Unknown outcome consumes reservation conservatively.
 - **Matches newest first (DB-Q02):** propose a GSI3 instead of LSI1: `GSI3PK=USER#{sub}#MATCHES`, `GSI3SK={createdAt}#{postingKey}`. Keep the stable match primary key for deduplication. Projection contains keys/basic feed fields; details come from base reads. Feed is eventually consistent; return newly created match directly where immediate visibility is required.
 - **Digest index:** preserve DB-I03 ownership, but GSI2 keys and timing are defined by DB-I03/DEL-020 and agreed by Luke under JDM-007; overall shared schema approval remains pending (DB-Q09). *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
-Accepted by: Ryan Fusco (2026-11-19; the complexity risk in JDM-Q04 still stands). Waiting for: Graham Cohick, Luke Campbell. DB-I01, DB-I02, and DB-I03 are still Proposed; this contract supplements them rather than silently accepting them.
+Accepted by: Ryan Fusco (2026-11-19; the complexity risk in JDM-Q04 still stands), Graham Cohick (2026-11-19; the pending regeneration amendment below comes back to him separately). Waiting for: Luke Campbell. DB-I01, DB-I02, and DB-I03 are still Proposed; this contract supplements them rather than silently accepting them.
 
 #### DB-I05: Profile and Settings items
 Status: Accepted (2026-11-19). Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009), Ryan Fusco (2026-11-19).

@@ -468,6 +468,7 @@ Review of Luke Campbell's contribution (2026-11-18): C1 â†’ DEL-017, C2 and Q1 â
   - A "mark as applied" action on a match, which sets the applied flag (DB-Q06).
   - A per-match "regenerate" action, for example `POST /matches/{postingKey}/regenerate`.
   - *Graham Cohick's answer (2026-11-18): WEB-001 (Accepted) provides all three: a `regenerate` choice on `POST /uploads` (default: no), `PUT` and `DELETE /matches/{postingKey}/applied`, and `POST /matches/{postingKey}/regenerate`. Still open: how the choice and the request reach the Matcher, and that regeneration waits for a successful parse (WEB-Q03, for Luke Campbell and Ryan Fusco).*
+  - *Graham Cohick's final answer (2026-11-19): the mechanics are settled. Luke Campbell's JDM-I05 carries both requests to the Matcher, and the API's side is WEB-013 (Accepted). Nothing in DEL-Q12 still waits on him.*
   - Owner: Graham Cohick
   - Blocks: DEL-008, DEL-014
 - **DEL-Q13: Luke Campbell needs to accept the Matcher's side of three decisions.**

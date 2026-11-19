@@ -14,14 +14,14 @@ Web App and API is how a student gets into Froop and uses it: signing in, upload
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-18
+Last reviewed: 2026-11-19
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current. Purpose and ground rules approved by the owner on 2026-11-18. |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-012, Interfaces (WEB-I01 and WEB-I02, both Proposed), and Open Questions WEB-Q01 to WEB-Q07 have content. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-013, Interfaces (WEB-I01 and WEB-I02, both Proposed), and Open Questions have content (WEB-Q01 to WEB-Q07 answered; WEB-Q05 and WEB-Q08 open). Requests From Other Areas is empty. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Out of date since 2026-11-18. Drawn on 2026-11-17 from the initial architecture plus other areas' decisions. It doesn't yet carry the IDs of WEB-001 to WEB-011, and its "Waiting on this owner" note still lists EB-Q10 and DB-Q06, which are answered. No component changed. Update and re-export it before the area goes to `In Review`. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. 16 tasks (WEB-T01 to WEB-T16). WEB-T01 and WEB-T11 are Planned, and the rest are Blocked on named decisions, interfaces, or questions. |
 

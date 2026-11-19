@@ -371,7 +371,7 @@ Contract:
 - **Upload:** one object per **presigned POST** (EB-018). The policy fixes the key, the content type `application/x-tex`, a size of 1 byte to 1 MB, and a 15-minute expiry. `create_upload` builds it (EB-019).
 - **User identity:** the parser takes the user from the key, so the key layout is part of the security model.
 - **Replacement:** a new upload replaces the bank only once it has parsed successfully (EB-002).
-Accepted by: Ryan Fusco (2026-11-19, provider). Waiting for: Graham Cohick (consumer), now that WEB-Q01 is answered.
+Accepted by: Ryan Fusco (2026-11-19, provider), Graham Cohick (2026-11-19, consumer: web-app-and-api). Both owners have accepted; the Status line is Ryan Fusco's to update.
 
 #### EB-I02: Term resolver
 Status: Deferred with EB-007 (2026-11-18)
@@ -395,7 +395,7 @@ Contract: A Python package owned by this area (EB-010). It is the only supported
 - `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
-Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list are Proposed. Waiting for: Graham Cohick and Luke Campbell.
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list are Proposed. Graham Cohick accepted the extension (2026-11-19, consumer: web-app-and-api). Waiting for: Luke Campbell.
 
 ### Consumes
 - **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), the section categories, entries, and skill categories (EB-016), and the upload record's new statuses, `expiresAt`, and `regenerate` (EB-019).
@@ -410,7 +410,7 @@ Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, sinc
 - **EB-Q10: The API, and the shared sections of the RFC, still need updating for EB-001 and EB-002.** The revised RFC (`architecture/revised-rfc/`) now covers this area's sections: the Summary, Goal 3, Bedrock's role, the Data Model, the upload file type, and Demo step 1. Still open:
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
     - *Answered by Graham Cohick (2026-11-18): it becomes `DELETE /experience` (WEB-001, Accepted). The revised RFC is updated.*
-  - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections. *Ryan Fusco asked Graham Cohick and Luke Campbell to confirm (2026-11-19), through their Requests From Other Areas tables.*
+  - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections. *Ryan Fusco asked Graham Cohick and Luke Campbell to confirm (2026-11-19), through their Requests From Other Areas tables. Graham Cohick confirms the wording (2026-11-19). Waiting for: Luke Campbell.*
   - Owner: Graham Cohick (API), group (shared sections)
   - Blocks: EB-I01 acceptance
 
@@ -420,4 +420,5 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| WEB-Q08 | `web-app-and-api/architecture.md` | With Luke Campbell: confirm that the JDM-I05 work record, not the `regenerate` value on the upload record (EB-019), is what triggers upload regeneration, and say what that value is then for. |
 | _None yet._ | | |

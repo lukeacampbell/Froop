@@ -14,14 +14,14 @@ The experience bank holds everything a student has done, in the student's own wo
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-17
+Last reviewed: 2026-11-18
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-006, EB-010, and EB-012 to EB-015 are Accepted. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-003, EB-005, EB-006, EB-010, and EB-012 to EB-017 are Accepted. EB-004 and EB-011 are superseded, and EB-007 is deferred. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 

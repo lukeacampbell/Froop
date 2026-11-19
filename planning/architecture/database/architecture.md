@@ -5,7 +5,7 @@ Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), Data Mod
 ## Scope
 
 **Owns:**
-- The logical design of the single DynamoDB table: the access patterns it serves, the key formats (`PK`, `SK`), GSI1, GSI2, LSI1, and the TTL attribute.
+- The logical design of the single DynamoDB table: the access patterns it serves, the key formats (`PK`, `SK`), GSI1, GSI2, GSI3, and the TTL attribute.
 - The registry of item types: which area writes each one and which areas read it.
 - The attribute definitions of every item type, proposed by the area that writes it.
 - Conditional-write rules that enforce uniqueness, such as one posting per postingKey and one match per user and posting.
@@ -68,20 +68,22 @@ Every way the data is read or written. They come from the RFC (pp.4–5) and the
 | DB-AP02 | Get a user's current bank: resolve the current-upload pointer, then read that upload's items | experience-bank (through its package, EB-010) | `USER#{sub}` / `DOC#…` | RFC p.5, EB-008 |
 | DB-AP03 | Replace a user's bank: write the new upload's items, switch the pointer, delete the old items | experience-bank | `USER#{sub}` / `DOC#…` | EB-002, EB-008 |
 | DB-AP04 | Add a posting only if it's new | job-discovery-and-matching | `POSTING#{postingKey}` / `META`, conditional put | RFC p.5 |
-| DB-AP05 | Find the users subscribed to a source, then filter by their settings | job-discovery-and-matching | GSI1 | RFC p.5 |
-| DB-AP06 | List catalog sources | job-discovery-and-matching | GSI1 | RFC p.5 |
+| DB-AP05 | Find the users subscribed to a source, then filter by their settings | job-discovery-and-matching | GSI1 `SOURCE#{sourceId}#SUBSCRIBERS` (DB-I04) | RFC p.5 |
+| DB-AP06 | List catalog sources | job-discovery-and-matching | GSI1 `CATALOG` (DB-I04) | RFC p.5 |
 | DB-AP07 | Create a match once per user and posting, with a copy of the posting details | job-discovery-and-matching | `USER#{sub}` / `MATCH#{postingKey}`, conditional put | RFC p.5, DB-Q05 |
-| DB-AP08 | List a user's matches, newest first | web-app-and-api | LSI1 (DB-Q02) | RFC p.5 |
-| DB-AP09 | Manage a user's private sources and subscriptions | web-app-and-api, job-discovery-and-matching (DB-Q03) | `SOURCE#{id}` / `META`; `USER#{sub}` / `SUB#{sourceId}` | RFC p.5 |
-| DB-AP10 | Find matches waiting for a digest | delivery (the Notifier) | GSI2. The Matcher sets the mark (DEL-011). | RFC p.5, DEL-011 |
+| DB-AP08 | List a user's matches, newest first | web-app-and-api | GSI3 `USER#{sub}#MATCHES`, sorted by `createdAt` (DB-Q02, DB-I04) | RFC p.5 |
+| DB-AP09 | Manage a user's private sources and subscriptions | web-app-and-api writes; job-discovery-and-matching reads (DB-I04) | `SOURCE#{id}` / `META`; `USER#{sub}` / `SUB#{sourceId}` | RFC p.5 |
+| DB-AP10 | Find matches waiting for a digest | delivery (the Notifier) | GSI2 `DIGEST#{mode}#{window}`. The Matcher sets the mark (DEL-011, DEL-020). | RFC p.5, DEL-011, DEL-020 |
 | DB-AP11 | Update a match's delivery state, conditionally | delivery | `USER#{sub}` / `MATCH#{postingKey}` | DB-I03 |
-| DB-AP12 | Check, and add to, the cost caps: per-user hourly, platform hourly, and platform daily | experience-bank, job-discovery-and-matching | `COST#{hour}`, `COST#{day}`, `USER#{sub}` / `COST#{hour}` (DB-Q07) | RFC p.5, OPS-002, OPS-010 |
+| DB-AP12 | *Superseded by DB-AP17.* Check, and add to, the cost caps: per-user hourly, platform hourly, and platform daily | experience-bank, job-discovery-and-matching | `COST#{hour}`, `COST#{day}`, `USER#{sub}` / `COST#{hour}` (DB-Q07) | RFC p.5, OPS-002, OPS-010 |
 | DB-AP13 | Find a user's matches in the regeneration window: posting still active, not marked applied | job-discovery-and-matching | `USER#{sub}` / `MATCH#…`, filtered on `appliedAt`, then a check that the posting exists | DEL-014 |
 | DB-AP14 | Mark a match as applied, or unmark it | web-app-and-api | `USER#{sub}` / `MATCH#{postingKey}` (DB-Q06) | DEL-014 |
 | DB-AP15 | Enumerate due/enabled sources | dispatcher | Paginated filtered scan, DB-I04 | JDM-003 |
 | DB-AP16 | Recover due work and expired leases | dispatcher/Matcher | Paginated filtered scan, DB-I04 | JDM-004 |
 | DB-AP17 | Reserve budget once across three counters | parser/Matcher | Transaction + reservation ID, DB-I04 | JDM-006 |
 | DB-AP18 | Persist dispatcher continuation/lease | dispatcher | SYSTEM#JDM / DISPATCH#{passType} | JDM-003 |
+| DB-AP19 | List a user's private sources | web-app-and-api | GSI1 `USER#{sub}#SOURCES` (DB-I04) | RFC p.5, DB-I04 |
+| DB-AP20 | List a board's postings, to reconcile after a complete poll | job-discovery-and-matching | GSI1 `BOARD#{boardToken}#POSTINGS` (DB-I04) | JDM-002, DB-I04 |
 
 ## Item Types
 
@@ -92,11 +94,11 @@ The item types listed in RFC p.5. Every row is `Proposed`.
 | Profile | `USER#{sub}` | `PROFILE` | web-app-and-api | delivery (email address) | DB-Q01 |
 | Settings | `USER#{sub}` | `SETTINGS` | web-app-and-api | job-discovery-and-matching, delivery | DB-Q01 |
 | Experience (uploads, roles, bullets, skills) | `USER#{sub}` | `DOC#…` | experience-bank | experience-bank only. Other areas go through its package, EB-I03 (EB-010). | DB-I02 |
-| Subscription | `USER#{sub}` | `SUB#{sourceId}` | DB-Q03 | job-discovery-and-matching, web-app-and-api | DB-Q01 |
+| Subscription | `USER#{sub}` | `SUB#{sourceId}` | web-app-and-api (DB-I04, answers DB-Q03) | job-discovery-and-matching, web-app-and-api | DB-Q01 |
 | Match | `USER#{sub}` | `MATCH#{postingKey}` | job-discovery-and-matching (including the digest mark, DEL-011), plus delivery state from delivery and the applied flag from web-app-and-api (DB-Q06) | web-app-and-api, delivery | DB-Q01, DB-I03 |
-| Source | `SOURCE#{id}` | `META` | DB-Q03 | job-discovery-and-matching, web-app-and-api | DB-Q01 |
+| Source | `SOURCE#{id}` | `META` | catalog seed (catalog sources), web-app-and-api (private sources), job-discovery-and-matching (polling fields only) (DB-I04, answers DB-Q03) | job-discovery-and-matching, web-app-and-api | DB-Q01 |
 | Posting | `POSTING#{postingKey}` | `META` | job-discovery-and-matching | delivery, web-app-and-api | DB-Q01 |
-| Cost counter (hourly platform total; daily and per-user counters pending DB-Q07) | `COST#{hour}` | `META` | job-discovery-and-matching, experience-bank (EB-004) | job-discovery-and-matching, experience-bank | DB-Q01 |
+| Cost counter (platform hourly and daily; per-user hourly as `USER#{sub}` / `COST#HOUR#…`, DB-I04) | `COST#HOUR#{UTC-hour}`, `COST#DAY#{UTC-date}` | `META` | job-discovery-and-matching, experience-bank (EB-004) | job-discovery-and-matching, experience-bank | DB-Q01 |
 | Work | USER#{sub} | WORK#{workId} | job-discovery-and-matching | JDM workers | DB-I04 |
 | Dispatcher checkpoint | SYSTEM#JDM | DISPATCH#{passType} | job-discovery-and-matching | dispatcher | DB-I04 |
 | Cost reservation | USER#{sub} | COSTRES#{attemptId} | parser/Matcher via JDM-I04 | parser/Matcher | DB-I04 |
@@ -111,8 +113,8 @@ Consumers: all areas, build-and-operation (provisions it)
 Contract:
 - **Table:** a single table with generic key attributes `PK` and `SK`, using the formats in Item Types.
 - **GSI1:** a source's subscribers, and all catalog sources.
-- **GSI2:** matches waiting for a digest.
-- **LSI1:** a user's matches by creation date.
+- **GSI2:** matches waiting for a digest, bucketed by send window: `DIGEST#hourly#{UTC-hour}` or `DIGEST#daily#{UTC-date}`, sorted by `{sub}#{createdAt}#{postingKey}` (DEL-020).
+- **GSI3:** a user's matches by creation date: `USER#{sub}#MATCHES` / `{createdAt}#{postingKey}` (DB-I04). It replaces the RFC's LSI1, so the table has no local secondary index (DB-Q02).
 - **TTL:** postings expire 30 days after they were last seen.
 
 Every item carries an item-type attribute. A new item type needs a new row in Item Types before anything writes it.
@@ -142,9 +144,10 @@ Written by: delivery (on Match items, which job-discovery-and-matching writes). 
 Consumers: web-app-and-api (shows the state), job-discovery-and-matching
 Contract: Attributes on `USER#{sub}` / `MATCH#{postingKey}`:
 - `renderStatus` (pending, rendered, skipped, failed), `renderReason` (for example `bank_replaced`, DEL-003), `renderedAt`
-- `pdfKey`: the current resume, `resume/{sub}/{postingKey}/{docId}.pdf` (DEL-009, Proposed), and `pdfHistory`, the earlier resume keys, which are never removed (DEL-007)
-- `notifyStatus` (pending, sent, failed), `sentAt`
-- the GSI2 keys that mark a match as waiting for a digest. The Matcher writes them when it creates the match (for hourly and daily students). The Notifier clears them after sending, or when the match was skipped (DEL-011).
+- `pdfKey`: the current resume, `resume/{sub}/{postingKey}/g{generation}.pdf` (DEL-009). Earlier resumes are listed from that S3 folder, not stored on the item (DB-Q08).
+- `generation` and `requestId` of the latest render request. Every delivery-state write is conditional on `generation` (DEL-017).
+- `notifyStatus` (pending, sending, sent, failed), `sendingSince`, `sentAt`. Emails are sent at most once (DEL-018).
+- the GSI2 keys that mark a match as waiting for a digest (format above, DEL-020). The Matcher writes them when it creates the match (for hourly and daily students). The Notifier removes them after sending, or when the match was skipped or failed, and moves still-pending matches to the next window's bucket (DEL-011, DEL-020).
 
 Writes are conditional updates, so a duplicate SQS message changes nothing.
 Accepted by: —
@@ -163,7 +166,7 @@ Contract:
 - **Cost counters:** `PK=COST#HOUR#{UTC-hour}, SK=META`; `PK=COST#DAY#{UTC-date}, SK=META`; per-user `PK=USER#{sub}, SK=COST#HOUR#{UTC-hour}`. `itemType=CostCounter`, integer `reservedMicroUsd`, window start/end, expiry at least seven days after window. Both parser and Matcher use JDM-I04; neither bypasses it.
 - **Reservation:** `PK=USER#{sub}, SK=COSTRES#{attemptId}`; `itemType=CostReservation`, upper bound, caller, model/pricing version, window IDs, createdAt, expiry. A single transaction conditionally creates it and increments all three counters within caps. Separate invocations require separate attempt IDs. Unknown outcome consumes reservation conservatively.
 - **Matches newest first (DB-Q02):** propose a GSI3 instead of LSI1: `GSI3PK=USER#{sub}#MATCHES`, `GSI3SK={createdAt}#{postingKey}`. Keep the stable match primary key for deduplication. Projection contains keys/basic feed fields; details come from base reads. Feed is eventually consistent; return newly created match directly where immediate visibility is required.
-- **Digest index:** preserve DB-I03 ownership, but exact GSI2 partition/sort keys, bucketing and schedule timezone remain a shared agreement (DB-Q09); implementation remains blocked until defined.
+- **Digest index:** preserve DB-I03 ownership, but exact GSI2 partition/sort keys, bucketing and schedule timezone remain a shared agreement (DB-Q09); implementation remains blocked until defined. *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
 Accepted by: —. DB-I01/02/03 remain Proposed; this supplements rather than silently accepts them.
 
 ### Consumes
@@ -171,12 +174,12 @@ Accepted by: —. DB-I01/02/03 remain Proposed; this supplements rather than sil
 
 ## Open Questions
 
-Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB-Q02 GSI3; DB-Q03 API configuration writes/JDM operational writes; DB-Q05 immutable bounded snapshot; DB-Q07 transactional counters and unique reservations. Ryan and Graham still need to agree. New questions: **DB-Q08** (Ryan/Luke): replace unbounded DB-I03 `pdfHistory` with child records before delivery implementation. **DB-Q09** (Ryan/Luke): define digest GSI2 keys and timing before JDM-T07. Both block final DB-I04 acceptance.
+Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB-Q02 GSI3; DB-Q03 API configuration writes/JDM operational writes; DB-Q05 immutable bounded snapshot; DB-Q07 transactional counters and unique reservations (Ryan Fusco agrees, 2026-11-18: EB-017). Ryan and Graham still need to agree. New questions: **DB-Q08** (Ryan/Luke): replace unbounded DB-I03 `pdfHistory` with child records before delivery implementation. *Ryan Fusco's answer (2026-11-18): drop `pdfHistory` entirely; history is the S3 folder `resume/{sub}/{postingKey}/` (DEL-009). DB-I03 is updated above, Proposed until every owner accepts.* **DB-Q09** (Ryan/Luke): define digest GSI2 keys and timing before JDM-T07. *Ryan Fusco's answer (2026-11-18): DEL-020.* Both block final DB-I04 acceptance.
 
 - **DB-Q01: What attributes do the remaining item types have?** That's Profile, Settings, Subscription, Match (apart from the delivery state), Source, Posting, and Cost counter. The owner of the area that writes each type needs to propose them.
   - Owner: Graham Cohick (Profile, Settings), Luke Campbell (Subscription, Match, Source, Posting, Cost counter)
   - Blocks: DB-I01 acceptance, delivery's use of postings and settings
-- **DB-Q02: LSI1 has to be decided before the first deploy.** A local secondary index can only be created along with the table. It also limits each user's partition to 10 GB, and every user's data lives in one partition. The alternatives are a GSI, or sorting matches by an `SK` that includes the date.
+- **DB-Q02: LSI1 has to be decided before the first deploy.** *Proposed answer: GSI3 (DB-I04). Luke Campbell proposed it and Ryan Fusco agrees (2026-11-18). Waiting for: Graham Cohick.* A local secondary index can only be created along with the table. It also limits each user's partition to 10 GB, and every user's data lives in one partition. The alternatives are a GSI, or sorting matches by an `SK` that includes the date.
   - Owner: Ryan Fusco, Luke Campbell
   - Blocks: DB-I01, the first deploy of the `data` module
 - **DB-Q03: Who writes Subscription items, and Source items for private pages?** They're created through the API (`POST /subscriptions`, `POST /sources`), but `job-discovery-and-matching` owns the concept.

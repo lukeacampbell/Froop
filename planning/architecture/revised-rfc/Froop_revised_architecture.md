@@ -30,6 +30,7 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-17 | DEL-015: Section tiers: required, likely, possible, and excluded | Summary |
 | 2026-11-17 | DEL-016: Certifications and Publications are possible, and every other section is excluded | Summary |
 | 2026-11-17 | DEL-014: Which matches regenerate after a new upload | Summary |
+| 2026-11-18 | DEL-009: Version resume PDFs by generation | Data Model |
 | 2026-11-18 | JDM-001: Greenhouse-only discovery | Architecture diagram, AWS Services, API source constraint, Risks, Alternatives; shared Summary/Goals/Demo marked pending SYS-Q04 |
 
 ## Team
@@ -133,12 +134,12 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 ### S3
 
 - `uploads/{sub}/{docId}.tex` stores the uploaded LaTeX resume. It's uploaded with a presigned PUT, and each upload triggers the parser. Only `.tex` files are accepted.
-- `resume/{sub}/{postingKey}.pdf` stores the generated resumes. They're served through expiring CloudFront signed URLs, and kept for as long as the match exists. *(pending DEL-009: versioning the key by upload)*
+- `resume/{sub}/{postingKey}/g{generation}.pdf` stores the generated resumes, one file per render request. A regeneration never overwrites an earlier resume, and a match's history is its folder. They're served through expiring CloudFront signed URLs, and kept for as long as the match exists.
 - `sub` keeps users' data separate, and everything is private.
 
 ## API
 
-JDM-001 constrains discovery sources to Greenhouse boards. The existing source routes below remain; Graham must agree token/URL validation and source/subscription ownership under JDM-I01. Arbitrary careers pages are no longer supported.
+Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers pages are no longer supported. *(pending JDM-I01: source validation and ownership rules)*
 
 | Method | Path | Auth Required? | Description |
 |---|---|---|---|

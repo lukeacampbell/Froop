@@ -97,7 +97,7 @@ Consequences:
 - **Other AWS costs** (Lambda, S3, DynamoDB) can't be capped per hour. They're covered by the monthly alert.
 
 ### OPS-003: Keep scraper and renderer images separate, and keep other functions out of the renderer image
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17). Waiting for: Graham Cohick, Luke Campbell (shared area).
+Status: Proposed. Accepted by: Ryan Fusco (2026-11-17). Waiting for: Graham Cohick, Luke Campbell (shared area). **Partly superseded by OPS-011:** the scraper image no longer contains Chromium or Playwright. The renderer separation still stands.
 Date: 2026-11-17
 Context: Answers part of OPS-Q03. Chromium (the Scraper) and TeX (the Renderer) make very large images. Putting the parser, Matcher, or Notifier in the renderer image would make those functions large too, and mix responsibilities.
 Decision:
@@ -148,7 +148,7 @@ Context: Answers OPS-Q06. The budget is tight, and finding the right balance of 
 Decision:
 - **Region:** `us-east-1` for Bedrock, and for the whole stack, to avoid traffic and latency between regions.
 - **Model:** start with the smallest, cheapest text model available on Bedrock in `us-east-1` that reliably returns structured (JSON) output. Candidates include Amazon Nova Micro and the current Claude Haiku-class model.
-- **Configurable for each task:** each Bedrock task has its own model setting, as a Terraform variable passed as an environment variable. The tasks are leftover-section classification (EB-003) and the Matcher's requirement extraction and ranking (owned by `job-discovery-and-matching`). For example, `BEDROCK_MODEL_PARSER_LEFTOVERS` and `BEDROCK_MODEL_MATCHER_RANK`. Changing a model is a configuration change.
+- **Configurable for each task:** each Bedrock task has its own model setting, as a Terraform variable passed as an environment variable. There are two tasks: leftover-section classification (EB-003, `BEDROCK_MODEL_PARSER_LEFTOVERS`) and the Matcher's single ranking call (JDM-005, `BEDROCK_MODEL_MATCHER_RANK`). There's no separate requirement-extraction call (revised 2026-11-18, review item C6). Changing a model is a configuration change.
 - **Measurement:** every call logs its input and output tokens and estimated cost (EMF, OPS-I04). Each task keeps a small labeled sample set, so models can be compared before switching.
 Alternatives:
 - Pick a larger model up front. Rejected: higher cost before we know it's needed.
@@ -306,8 +306,8 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 | web-app-and-api | Cognito user pool and hosted UI; API Gateway HTTP API with a JWT authorizer; `api` image; CloudFront and the S3 static site; read access to the signing key | RFC p.3–4, 7 | Proposed |
 | experience-bank | Uploads bucket that accepts only `.tex` (presigned PUT limited to that content type and the size limit), with event notifications to the Bank parser; parser Lambda (small: a Python LaTeX parser, with no OCR and no TeX install, EB-001, EB-009); Bedrock invoke permission; read and write on the `COST#` counter (EB-004); table access for experience items | RFC p.3, 5; EB-I01 | Proposed |
 | job-discovery-and-matching | One dispatcher tick; HTTP-only Greenhouse scraper; Matcher; scrape/match/render queues and DLQs; durable recovery and cost reservations; seed catalog. Digest schedules stay with delivery. See OPS-I05 for permissions/configuration. | JDM-001 to JDM-007, OPS-011 | Proposed amendment; replaces RFC-derived JDM intake |
-| delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES, DEL-004); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |
-| database | One table with the keys, GSI1, GSI2, LSI1, and TTL from DB-I01 | RFC p.5; DB-I01 | Proposed |
+| delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES at most once, DEL-004, DEL-018); hourly and daily digest schedules that trigger the Notifier (DEL-019); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |
+| database | One table with the keys, GSI1, GSI2, GSI3 (no LSI), and TTL from DB-I01 and DB-I04 | RFC p.5; DB-I01; DB-I04 | Proposed |
 | experience-bank | The experience bank package (EB-I03) built into the `api` image and every image that runs the parser, Matcher, or Renderer | EB-010 | Proposed |
 | all | Spend limits and alarms that email the team | RFC p.8 | Proposed |
 

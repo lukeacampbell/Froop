@@ -16,7 +16,8 @@ Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), pp.1–5
 - **The `resume/` prefix layout.** Resumes are kept for as long as the match exists (DEL-007). The bucket itself comes from `build-and-operation`.
 - **The Notifier Lambda:**
   - Sends instant emails with the PDF attached.
-  - Sends hourly or daily digests with signed links (DEL-004) when the EventBridge digest schedule fires.
+  - Sends hourly or daily digests with signed links (DEL-004) when delivery's own digest schedules fire (DEL-019).
+  - Sends each email at most once (DEL-018).
   - Finds matches the Matcher marked as waiting for a digest, sends only the ones already rendered, and clears the mark once they're sent or skipped (DEL-011).
 - **Email content and SES templates.**
 - **Regenerating resumes after a new upload,** when the student asks for it (DEL-008).
@@ -119,7 +120,7 @@ Consequences:
 Status: Proposed
 Date: 2026-11-16
 Context: Review item 2, and EB-002.
-Decision: Every render message carries the `docId` of the upload its items came from (DEL-010). If that's no longer the student's current upload, or `get_items` (EB-I03) reports missing IDs, the Renderer:
+Decision: Every render message carries the `docId` of the upload its items came from, plus its `generation` (DEL-010, DEL-017). If the `docId` is no longer the student's current upload, the generation is older than the match's current one, or `get_items` (EB-I03) reports missing IDs, the Renderer:
 - sets the match's `renderStatus` to `skipped`, with the reason `bank_replaced`
 - sends no email
 - deletes the message without retrying
@@ -136,7 +137,7 @@ Date: 2026-11-17
 Context: Answers DEL-Q01, and RFC Risks (p.8).
 Decision:
 - **Instant delivery:** one email per match, with the resume PDF attached and the posting details in the body.
-- **Hourly and daily digests:** one email listing the new matches. Each has a CloudFront signed link to its resume, valid for a limited time (suggestion: 7 days).
+- **Hourly and daily digests** (send times and buckets: DEL-020): one email listing the new matches. Each has a CloudFront signed link to its resume, valid for a limited time (suggestion: 7 days).
 - **After a link expires,** the student opens the match in the dashboard, which signs a fresh link (`GET /matches/{postingKey}`).
 Alternatives:
 - Attachments everywhere. Rejected: large digests are more likely to be flagged as spam.
@@ -216,20 +217,26 @@ Consequences:
 - `job-discovery-and-matching` has to support re-ranking existing matches (DEL-Q13).
 - Which matches count as "existing" is set by DEL-014.
 
-### DEL-009: Version resume PDFs by upload, so a regeneration never overwrites one
-Status: Proposed
-Date: 2026-11-17
-Context: Follows from DEL-007 and DEL-008. If a regeneration overwrote `resume/{sub}/{postingKey}.pdf`, the resume the student actually applied with would be lost.
-Decision: The key includes the upload the resume was built from: `resume/{sub}/{postingKey}/{docId}.pdf`. The match records its current resume key and the earlier ones (DB-I03).
+### DEL-009: Version resume PDFs by generation, so a regeneration never overwrites one
+Status: Accepted (Ryan Fusco, 2026-11-18)
+Date: 2026-11-17 (revised 2026-11-18: key by generation instead of `docId`; history from S3 instead of a list)
+Context: Follows from DEL-007 and DEL-008. If a regeneration overwrote `resume/{sub}/{postingKey}.pdf`, the resume the student actually applied with would be lost. Keying by `docId` alone wasn't enough, because a per-match regeneration with the same upload (DEL-014) reuses the `docId` (review items C2 and Q1).
+Decision:
+- **Key:** `resume/{sub}/{postingKey}/g{generation}.pdf`, using the generation from DEL-017. Every render request gets its own file.
+- **On the match:** only `pdfKey` (the current resume) and the `docId` it was built from.
+- **History:** a match's earlier resumes are the other files under `resume/{sub}/{postingKey}/`. The dashboard lists that folder. The match doesn't keep a growing list of keys.
 Alternatives:
+- Key by `docId` (the earlier draft). Rejected: per-match regeneration with the same upload overwrote the file.
 - Overwrite in place. Rejected: it loses the resume the student applied with.
 - S3 object versioning. Rejected: it's harder to list and link to specific versions from the dashboard.
+- A growing `pdfHistory` list on the match. Rejected: the folder listing already gives the history (DB-Q08).
 Consequences:
 - DEL-I01 and DB-I03 change.
-- The dashboard can show earlier resumes for a match.
+- The dashboard can show every earlier resume for a match by listing its folder.
+- `postingKey` appears in the key, so it must be safe in S3 keys and URLs (DEL-Q15).
 
 ### DEL-010: The render message carries ranked experiences, projects, and skills by category
-Status: Accepted (Ryan Fusco, 2026-11-17). The message is defined by `job-discovery-and-matching`, so Luke Campbell must also accept it (DEL-Q13).
+Status: Accepted (Ryan Fusco, 2026-11-17). Extended by DEL-017. The message is defined by `job-discovery-and-matching`, so Luke Campbell must also accept it (DEL-Q13).
 Date: 2026-11-17
 Context: Answers DEL-Q04. The Renderer needs a ranking it can trim to one page (DEL-005).
 Decision: Each message on SQS render contains:
@@ -357,6 +364,76 @@ Alternatives:
 Consequences:
 - `experience-bank` labels sections `certifications` and `publications` (EB-016). Every unlisted heading falls into `other`, which is never rendered.
 
+### DEL-017: The render message carries a request ID and a generation, and the Renderer drops repeats and stale work
+Status: Accepted (Ryan Fusco, 2026-11-18). Extends DEL-010. Luke Campbell defines the message (JDM-I03).
+Date: 2026-11-18
+Context: Answers C1 from the review of Luke Campbell's JDM-I03. With only `docId`, the Renderer can't tell a retried message from a new one, and a slow, older regeneration could overwrite a newer resume, because both use the same upload.
+Decision: The render message (DEL-010) gains three fields:
+- `schemaVersion`: the message format version (starts at 1).
+- `requestId`: identifies one render request. Retries of the same request keep the same ID.
+- `generation`: a per-match counter that goes up by 1 for each regeneration request. A new match starts at 1.
+
+The Renderer:
+- **Drops repeats:** a message whose `(sub, postingKey, docId, requestId)` has already been rendered is acknowledged and dropped.
+- **Drops stale work:** a message whose `generation` is lower than the match's current generation is dropped. Every write to the match's delivery state is conditional on the generation.
+- **Accepts only one version:** an unknown `schemaVersion` fails visibly and goes to the DLQ.
+Alternatives:
+- Rely only on conditional writes to `renderStatus`. Rejected: it can't stop an older regeneration that finishes last.
+Consequences:
+- DEL-003 also checks `generation`, not just `docId`.
+- Resume keys include the generation (DEL-009).
+- DB-I03 records the current `generation` and `requestId`.
+
+### DEL-018: Emails are sent at most once
+Status: Accepted (Ryan Fusco, 2026-11-18)
+Date: 2026-11-18
+Context: Answers Q3 from the review (part of JDM-Q02). SES can't guarantee exactly-once delivery. If the Notifier sends and then crashes before recording it, a retry sends again. The delivery ground rule says a student hears about each match at most once.
+Decision:
+1. Before sending, the Notifier changes `notifyStatus` from `pending` to `sending` with a conditional write. If that fails, another attempt already owns the email, so it stops.
+2. It sends through SES.
+3. It changes `sending` to `sent`.
+- **Stuck emails:** a match left in `sending` for more than 15 minutes (a crash between steps 1 and 3) is marked `failed` by the next Notifier run and is **not** sent again. The resume is still in the dashboard.
+- **Digests:** the same rule applies to every match in a digest. The digest email lists only matches the Notifier moved to `sending`.
+Alternatives:
+- At least once: send first, then record. Rejected: a crash can cause a duplicate email.
+Consequences:
+- DB-I03 `notifyStatus` gains `sending`.
+- A rare crash can lose an email, but never doubles one.
+
+### DEL-019: Delivery owns the digest schedules
+Status: Accepted (Ryan Fusco, 2026-11-18)
+Date: 2026-11-18
+Context: Answers C4 from the review. Delivery described the digest schedule as something it consumes from `build-and-operation`. Luke Campbell's OPS-011 and JDM-003 call it a delivery resource. No area owned its definition.
+Decision:
+- Delivery defines two EventBridge schedules that trigger the Notifier: **hourly**, at the top of each hour, and **daily**, at 13:00 UTC (DEL-020).
+- They live with the Notifier in the `resumes` Terraform module. `build-and-operation` provisions them like any other resource.
+Alternatives:
+- `build-and-operation` owns them. Rejected: they exist only to trigger the Notifier.
+Consequences:
+- The delivery row in the Requirements Intake lists both schedules.
+- The delivery diagram shows the schedule as delivery's own, not as another area's part.
+
+### DEL-020: Digest marks name the send window they belong to
+Status: Accepted (Ryan Fusco, 2026-11-18). The key format is in DB-I03 (shared database area, Proposed until every owner accepts).
+Date: 2026-11-18
+Context: Answers Q2 from the review (DB-Q09 on the delivery side) and DEL-Q16. The Notifier needs a fast way to find the matches waiting for each digest.
+Decision:
+- **Send times:** hourly digests go out at the top of each UTC hour. Daily digests go out at **13:00 UTC** (8:00 a.m. Eastern Standard Time; fixed in UTC, so it doesn't move with daylight saving).
+- **The mark:** when the Matcher creates a match for an hourly or daily student (DEL-011), it sets:
+  - `GSI2PK = DIGEST#hourly#{UTC-hour of the next send}` (for example `DIGEST#hourly#2026-11-20T15`), or `DIGEST#daily#{UTC-date of the next 13:00 send}` (for example `DIGEST#daily#2026-11-21`)
+  - `GSI2SK = {sub}#{createdAt}#{postingKey}`, so each student's matches sit together, oldest first.
+- **At each send, the Notifier:**
+  - Reads the bucket for this window.
+  - Also reads the earlier buckets it may have missed (the last 24 hourly buckets, or the last 7 daily buckets), so a failed run doesn't strand matches.
+  - Matches that are `rendered` go in the email (DEL-018), and then their GSI2 fields are removed.
+  - Matches still `pending` are moved to the next window's bucket.
+  - Matches that are `skipped` or `failed` lose the mark, and no email is sent.
+Alternatives:
+- One bucket per mode (`DIGEST#hourly`). Rejected by the owner, in favor of splitting by send window: each query reads only one window's matches.
+Consequences:
+- The Matcher computes the bucket from the student's delivery mode and the send times above (JDM-007).
+- DEL-Q16 is answered: 13:00 UTC.
+
 ## Interfaces
 
 ### Provides
@@ -365,23 +442,26 @@ Consequences:
 Status: Proposed
 Consumers: web-app-and-api (signs dashboard links)
 Contract:
-- **Key and access:** `resume/{sub}/{postingKey}/{docId}.pdf` (DEL-009), private, and served only through CloudFront signed URLs.
+- **Key and access:** `resume/{sub}/{postingKey}/g{generation}.pdf` (DEL-009), private, and served only through CloudFront signed URLs.
+- **History:** every file under `resume/{sub}/{postingKey}/` is a resume for that match. The newest generation is current.
 - **Lifetime:** never deleted while the match exists (DEL-007).
 - **Missing PDF:** an object may not exist yet (still rendering) or may have been skipped (DEL-003). The match's `renderStatus` (DB-I03) says which.
 Accepted by: —
 
 ### Consumes
-- **The SQS render message:** from `job-discovery-and-matching`, which defines it. DEL-010 lists what Delivery needs. Luke Campbell has to accept it (DEL-Q13).
+- **The SQS render message:** JDM-I03 from `job-discovery-and-matching`. Ryan Fusco accepted it on 2026-11-18 as the consumer. It covers DEL-010 and DEL-017.
 - **The header block, ranked items (`source` and `text`), and the supported-template list:** EB-I03, the experience bank package (EB-010, EB-014, EB-015). This area doesn't read experience items from the table directly.
 - **Match delivery state:** DB-I03 in `database`. Delivery writes it.
 - **Posting details kept on the match** (title, company, location, apply link), used in emails: DB-Q05.
 - **User settings** (delivery mode, email address): item types in `database`, not defined yet (DB-Q01).
 - **The student's "regenerate?" choice** for each upload: from `web-app-and-api` (DEL-Q12).
-- **Infrastructure from `build-and-operation`:** the CloudFront signing key from Secrets Manager, SES, the Renderer image with LaTeX, buckets, the EventBridge digest schedule, and alarms (OPS-I01–I04).
+- **Infrastructure from `build-and-operation`:** the CloudFront signing key from Secrets Manager, SES, the Renderer image with LaTeX, buckets, and alarms (OPS-I01–I04). It also provisions the digest schedules, which delivery defines (DEL-019).
 
 ## Open Questions
 
 Answered: DEL-Q01 (DEL-004), DEL-Q02 (DEL-005), DEL-Q03 (DEL-006), DEL-Q04 (DEL-010), DEL-Q05 (DEL-007), DEL-Q06 (DEL-011), DEL-Q07 (EB-015), DEL-Q08 (DEL-008), DEL-Q09 (DEL-015, which supersedes DEL-012), DEL-Q10 and DEL-Q11 (DEL-014), DEL-Q14 (DEL-016).
+
+Review of Luke Campbell's contribution (2026-11-18): C1 → DEL-017, C2 and Q1 → DEL-009 revised, C4 → DEL-019, Q3 → DEL-018, C3 → DEL-Q15, Q2 and DEL-Q16 → DEL-020.
 
 - **DEL-Q12: `web-app-and-api` needs to provide three things for DEL-008 and DEL-014.**
   - A "regenerate resumes for my existing matches?" choice when uploading (default: no).
@@ -397,14 +477,16 @@ Answered: DEL-Q01 (DEL-004), DEL-Q02 (DEL-005), DEL-Q03 (DEL-006), DEL-Q04 (DEL-
     - re-ranking one match on request, using the match's own copy of the posting details (DB-Q05)
 
   Ryan Fusco can propose these in `job-discovery-and-matching` as a contributor.
+  - **Status (2026-11-18):** Luke Campbell's proposed answers are JDM-007 and JDM-I03. Ryan Fusco accepted JDM-I03 as the consumer, including the generation extension (DEL-017). Still waiting for Luke Campbell to accept JDM-007 and JDM-I03 on his side.
   - Owner: Luke Campbell
   - Blocks: DEL-010, DEL-011, DEL-014
-
+- **DEL-Q15: Use a URL-safe separator in `postingKey`.** JDM-002 proposes `gh:{boardToken}:{jobPostId}`. The key appears in S3 keys (DEL-009), CloudFront signed URLs, and `/matches/{postingKey}`. Colons get percent-encoded inconsistently, which breaks signed-URL checks. Board tokens are limited to `[A-Za-z0-9_-]` (JDM-I01), so `.` can't appear in a token. **Ryan Fusco's recommendation (2026-11-18):** `gh.{boardToken}.{jobPostId}`.
+  - Owner: Luke Campbell (JDM-002)
+  - Blocks: DEL-009 keys, DEL-I01
 ## Requests From Other Areas
 
 Pointers to items defined in other areas that this area's owner has to act on. Answer each one where it's defined, then delete its row (see "Coordinating Across Areas" in `planning/architecture/AGENTS.md`).
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| JDM-Q02, JDM-I03 | `job-discovery-and-matching/architecture.md` | Agree render request/generation deduplication, digest keys and regeneration; document SES send/record ambiguity; update diagram. |
-| DB-Q08, DB-Q09 | `database/architecture.md` | Agree bounded PDF-history storage and exact digest index keys before implementation. |
+| _None yet._ | | |

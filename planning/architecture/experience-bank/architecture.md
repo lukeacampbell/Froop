@@ -117,7 +117,7 @@ Consequences:
 - The verbatim check is a test that can be automated (Goal 3).
 
 ### EB-004: Parser Bedrock calls count toward the hourly cost cap
-Status: Accepted (Ryan Fusco, 2026-11-13)
+Status: Superseded by EB-017 (the mechanism; parser calls still count toward the caps)
 Date: 2026-11-13
 Context: Answers EB-Q03.
 Decision: Before calling Bedrock, the parser checks the shared hourly cost counter and adds to it, the same way the Matcher does.
@@ -148,7 +148,7 @@ Consequences:
 - Matching needs the term resolver to compare "JS" with "JavaScript".
 
 ### EB-007: Add a dictionary-based term resolver for matching
-Status: Proposed
+Status: Deferred (Ryan Fusco, 2026-11-18). Not in this version. The Matcher makes one ranking call per posting with no extracted requirement terms (JDM-005), and that call already matches synonyms such as JS and JavaScript (review item C6). Revisit if deterministic skill matching is needed later.
 Date: 2026-11-13
 Context: Follows from EB-006. A posting may ask for "JavaScript" while the student wrote "JS".
 Decision:
@@ -300,6 +300,23 @@ Consequences:
 - `get_bank` (EB-I03) returns items grouped by section category, with skills grouped by skill category.
 - Splitting skills on commas has to respect braces and escaped characters. For example, `C/C++` is one skill, and so is `Node.js`.
 
+### EB-017: The parser reserves Bedrock budget through the shared reservation package
+Status: Accepted (Ryan Fusco, 2026-11-18). Supersedes EB-004's mechanism; parser calls still count toward the caps.
+Date: 2026-11-18
+Context: Answers C5 from the review of Luke Campbell's JDM-006 and JDM-I04. Checking a counter and then adding to it lets two callers both pass the check and overspend.
+Decision:
+- Before every Bedrock call, the parser calls `reserve(...)` from the shared reservation package (JDM-I04), using a new attempt ID for each call.
+- The package atomically reserves a worst-case cost (input tokens plus the configured maximum output tokens) against the per-user hourly, platform hourly, and platform daily counters.
+- **Deferred:** the leftover sections stay `unclassified` (EB-013) and are retried at the returned `nextAttemptAt`.
+- **Blocked configuration:** the upload status notes that the leftovers couldn't be classified.
+- Counter keys follow DB-I04 (`COST#HOUR#…`, `COST#DAY#…`, and per-user `USER#{sub}` / `COST#HOUR#…`).
+- **Keeping the overcount small:** the parser's maximum output tokens are kept close to real usage, and its actual token usage is logged, so the cap isn't wasted on overestimates.
+Alternatives:
+- Check, then add (EB-004 as written). Rejected: it can overspend when calls happen at the same moment.
+Consequences:
+- The parser depends on a package owned by `job-discovery-and-matching`.
+- No refunds in v1, so each reservation may count more than the call really cost.
+
 ## Interfaces
 
 ### Provides
@@ -315,7 +332,7 @@ Contract:
 Accepted by: —
 
 #### EB-I02: Term resolver
-Status: Proposed
+Status: Deferred with EB-007 (2026-11-18)
 Consumers: job-discovery-and-matching
 Contract:
 - **Function:** `resolve(term) -> canonical`. It's deterministic, makes no network calls, and always returns the same result for the same dictionary version.
@@ -331,21 +348,21 @@ Contract: A Python package owned by this area (EB-010). It is the only supported
 - `get_items(sub, ids)`: specific items by ID. Missing IDs (replaced by a newer upload) are reported, not raised as errors.
 - `delete_bank(sub)`: deletes the bank and the uploaded file
 - `upload_status(sub)`: pending, parsed, parsed with unclassified sections (EB-013), or failed, with a reason
-- `resolve(term)`: the term resolver (EB-I02)
+- `resolve(term)`: the term resolver (EB-I02). Deferred with EB-007, so it isn't in v1.
 - `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
 Accepted by: —
 
 ### Consumes
-- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `canonical` field on skills (EB-007), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), and the section categories, entries, and skill categories (EB-016).
+- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), and the section categories, entries, and skill categories (EB-016).
 - **The user's Cognito `sub`:** through the upload key (EB-I01), which `web-app-and-api` issues.
-- **Bedrock, and the hourly cost counter:** `COST#{hour}`, owned by `job-discovery-and-matching` (EB-004).
+- **Bedrock, and the shared reservation package:** JDM-I04, owned by `job-discovery-and-matching` (EB-017). Ryan Fusco accepted it on 2026-11-18 as the consumer.
 - **The uploads bucket with event notifications, the shared table, the parser Lambda image, and its IAM role:** from `build-and-operation` (OPS-I01, OPS-I02, OPS-I03).
 
 ## Open Questions
 
-Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, since superseded by EB-015), EB-Q09 (EB-012), EB-Q11 (EB-013), EB-Q12 (EB-014), EB-Q13 (EB-015).
+Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, since superseded by EB-015), EB-Q09 (EB-012), EB-Q11 (EB-013), EB-Q12 (EB-014), EB-Q13 (EB-015). Review of Luke Campbell's contribution (2026-11-18): C5 → EB-017, C6 → EB-007 deferred.
 
 - **EB-Q10: The API, and the shared sections of the RFC, still need updating for EB-001 and EB-002.** The revised RFC (`architecture/revised-rfc/`) now covers this area's sections: the Summary, Goal 3, Bedrock's role, the Data Model, the upload file type, and Demo step 1. Still open:
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
@@ -359,4 +376,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| JDM-Q02, JDM-I04 | `job-discovery-and-matching/architecture.md` | Agree shared cost reservation package and EB-I02/03 consumer usage; provide package/task IDs and update cost-flow diagram. |
+| JDM-T05 | `job-discovery-and-matching/implementation-plan.md` | Once this area's implementation plan exists, give the task ID for adopting JDM-I04 in the parser. JDM-T05 links to it. |

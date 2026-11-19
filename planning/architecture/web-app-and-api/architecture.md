@@ -99,6 +99,7 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 | DB-Q01 | `database/architecture.md` | Propose the attributes of Profile and Settings items. |
 | DB-Q03 | `database/architecture.md` | Decide with Luke Campbell who writes Subscription items and private Source items. |
 | DB-Q06 | `database/architecture.md` | Decide where the "applied" flag lives (recommended: `appliedAt` on the match). |
+| DB-Q02 | `database/architecture.md` | As a co-owner, agree to GSI3 instead of LSI1 for the matches feed. The feed may lag a new match by a moment, so return a newly created match directly when it has to show immediately. |
 | DB-I01 to DB-I03 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the match delivery state (the dashboard shows it). |
 | OPS-Q07 | `build-and-operation/architecture.md` | Confirm this area's row in the Requirements Intake. |
 | OPS-001 to OPS-007, OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept or challenge Ryan Fusco's answers: the state lock, the $1/user and $5/platform hourly caps, the image split, CI, the Bedrock model and region, and the repo layout. Also accept the four contracts. |

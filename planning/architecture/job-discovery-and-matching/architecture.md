@@ -153,13 +153,13 @@ Accepted by: —
 Status: Proposed
 Consumers: delivery
 Contract: `schemaVersion:1`, `sub`, `postingKey`, `docId`, `requestId`, `generation`, `reason` (`new_match` or `regenerate`), `rankedExperiences:[{roleId,score,rankedBullets:[{bulletId,score}]}]`, `rankedProjects:[{projectId,score,rankedBullets:[{bulletId,score}]}]`, `skills:[{category,score,rankedSkills:[skillId]}]`. Scores use JDM-005. Education and allowed unranked sections come from EB-I03. No rewritten text. Serialize at most 200 KiB (an application limit); oversized output fails visibly. Same work retry sends byte-equivalent stored payload. Delivery uses generation and request ID for conditional ownership and deduplication, preserves old PDFs, and suppresses regeneration email. Final schema/digest keys need Ryan and database agreement.
-Accepted by: —
+Accepted by: Ryan Fusco (2026-11-18, consumer: delivery, recorded as DEL-017). Waiting for: Luke Campbell (provider).
 
 #### JDM-I04: Shared Bedrock budget reservation
 Status: Proposed
 Consumers: experience-bank, Matcher; database and build-and-operation
 Contract: `reserve(sub, attemptId, upperBoundMicroUsd, nowUtc)` returns `reserved`, `already_reserved` (not permission to invoke again), `deferred(nextAttemptAt)`, or `blocked_configuration`. Transaction writes one unique reservation and increments three counters only if all caps permit it. Counter window identifiers are UTC and unambiguous (`HOUR#...`, `DAY#...`). Retry of the transaction with the same attempt cannot double charge; a new actual invocation needs a new attempt ID. Counters/reservations remain at least seven days beyond the window. Crash/timeout after reserving may waste allowance but never release uncertain spend. Caller logs actual tokens and estimated cost separately without logging bank/job content. See JDM-006 and DB-I04.
-Accepted by: —
+Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-017). Waiting for: Luke Campbell (provider). Shared database and build-and-operation parts follow DB-I04 and OPS-I05.
 
 ### Consumes
 
@@ -172,7 +172,29 @@ Accepted by: —
 
 - **JDM-Q01:** Graham: agree JDM-I01, settings (`titleIncludes`, `titleExcludes`, `locationIncludes`, `deliveryMode`), and durable regeneration command producer contract. Upload regeneration must wait for successful bank replacement; per-match commands must authorize `sub` and use an idempotent request ID. Blocks JDM-T03/T07/T09; API implementation task IDs do not exist yet.
 - **JDM-Q02:** Ryan: agree JDM-I03 generation/deduplication contract, EB-I02/03 usage, and JDM-I04 parser cost reservations. Confirm how SES send/record failures are reconciled: an SQS/digest conditional write alone cannot guarantee exactly-once external email. Blocks JDM-T06/T08/T09 and full duplicate-email demo signoff. Provider implementation task IDs do not exist yet.
+  - **Ryan Fusco's answers (2026-11-18):**
+    - JDM-I03 accepted, including `requestId` and `generation` (DEL-017).
+    - Resume keys use the generation (DEL-009).
+    - JDM-I04 accepted for the parser (EB-017).
+    - Emails are sent **at most once** (DEL-018).
+    - The term resolver (EB-I02, EB-007) is deferred, so the Matcher doesn't depend on it in v1.
+    - Separately, Ryan recommends a URL-safe `postingKey` separator (DEL-Q15).
+    - Still open: the digest index keys (DB-Q09).
 - **JDM-Q03:** Group: accept DB-I04 and OPS-I05, including GSI instead of LSI1 and dispatcher scan tradeoff; attach DB/OPS task IDs when written. Blocks integration/deploy, not completion of this planning draft.
+- **JDM-Q04 (risk, raised by Ryan Fusco as contributor, 2026-11-18): Is there a simpler fallback if time runs short?** No action is needed now. This is a watch item.
+  - **The concern:** the project is due in about a month. This design includes:
+    - an 8-state work machine
+    - leases with fencing generations
+    - checkpointed table scans
+    - a reservation ledger
+
+    Most JDM tasks are blocked on cross-area agreements.
+  - **Possible fallbacks** (Luke's call), if a checkpoint the group picks (for example, the end of November) arrives with JDM-T02 and JDM-T04 unfinished:
+    - Drop the scan checkpoints. A small Greenhouse catalog fits in one DynamoDB scan page.
+    - Use SQS visibility timeouts plus conditional status changes instead of leases and fencing. Keep only the match `generation` (DEL-017).
+    - Cut the work states down to about four: pending, deferred, done, and failed.
+  - Owner: Luke Campbell
+  - Blocks: nothing yet
 - **SYS-Q04 (defined in architecture/AGENTS.md):** Group confirmation of Greenhouse-only shared goals and demo. Requested product scope is settled by Luke; group-owned document signoff remains outstanding.
 
 ### Planning exit check (2026-11-18)
@@ -195,15 +217,13 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 | SYS-Q02 | `architecture/AGENTS.md` | Confirm shared ownership of `database`, with Ryan Fusco coordinating. |
 | SYS-Q03 | `architecture/AGENTS.md` | Group: confirm which Terraform module holds each area's resources, including whether the Matcher sits in `ingestion` or `resumes`. |
 | DEL-Q13 | `delivery/architecture.md` | Accept the Matcher's side of three decisions: DEL-010 (the render message, with ranked experiences, projects, and skills by category; scores comparable across entries), DEL-011 (marking matches for the next digest), and DEL-014 (re-ranking matches when a student regenerates). |
-| EB-004 | `experience-bank/architecture.md` | Agree that the Bank parser also reads and writes the `COST#` counter this area owns. |
-| EB-I02 | `experience-bank/architecture.md` | Accept the term resolver, and use it on terms from postings (EB-007). |
 | EB-I03 | `experience-bank/architecture.md` | Accept the experience-bank package as the Matcher's way to read the bank. Unclassified items are excluded (EB-013). |
 | DB-Q01 | `database/architecture.md` | Propose the attributes of Subscription, Match, Source, Posting, and Cost counter items. |
-| DB-Q02 | `database/architecture.md` | Decide with Ryan Fusco whether to keep LSI1, before the first deploy. |
 | DB-Q03 | `database/architecture.md` | Decide with Graham Cohick who writes Subscription items and private Source items. |
 | DB-Q05 | `database/architecture.md` | Copy the posting details onto each match when creating it. Matches never expire, but postings do (DEL-007). |
 | DB-I01 to DB-I03 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the match delivery state. The Matcher writes the digest mark. |
-| DB-Q07 | `database/architecture.md` | Add per-user hourly and daily platform cost counters next to the hourly platform counter (OPS-002, OPS-010). |
+| DEL-020 | `delivery/architecture.md` | When creating a match for an hourly or daily student, set the GSI2 bucket for the next send window (hourly at the top of the UTC hour, daily at 13:00 UTC). |
+| DEL-Q15 | `delivery/architecture.md` | Consider changing the `postingKey` separator to `.` (`gh.{boardToken}.{jobPostId}`), so keys are safe in S3 paths and signed URLs. |
 | OPS-002, OPS-010 | `build-and-operation/architecture.md` | Decide what the Matcher does when a cost cap is reached (hourly per-user, hourly platform, or daily platform). For example, defer the ranking until the cap resets. |
 | OPS-Q07 | `build-and-operation/architecture.md` | Confirm this area's row in the Requirements Intake. |
 | OPS-001 to OPS-007, OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept or challenge Ryan Fusco's answers: the state lock, the hourly caps, the image split, CI, the Bedrock model and region (OPS-006 sets a separate model for each Matcher task), and the repo layout. Also accept the four contracts. |

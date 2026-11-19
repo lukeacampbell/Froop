@@ -14,14 +14,14 @@ Delivery gives a student a finished one-page resume for every job match, and tel
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-17
+Last reviewed: 2026-11-18
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. DEL-004 to DEL-008, DEL-010, DEL-011, and DEL-014 to DEL-016 are Accepted. DEL-012 is superseded. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. DEL-004 to DEL-008, DEL-009 to DEL-011 and DEL-014 to DEL-020 are Accepted. DEL-012 is superseded. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Not created yet. Created in step 6 of "How to Plan an Area". |
 

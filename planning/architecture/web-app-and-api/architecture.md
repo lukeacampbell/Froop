@@ -419,7 +419,8 @@ Consequences:
 - WEB-I01, WEB-T10, and WEB-T14 change to match.
 
 ### WEB-012: Account deletion is a non-goal for this version
-Status: Proposed. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Waiting for: Luke Campbell, because Non-Goals is a shared section of the RFC (SYS-Q05).
+**Luke's acceptance (2026-11-21):** Agree SYS-Q05: no self-service account deletion in this demo; handle data-deletion requests manually. This limits UI/API scope while retaining a way to delete data. All three owners now agree; Graham can finalize his decision status.
+Status: Proposed. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Luke Campbell agrees (2026-11-21, SYS-Q05); Graham to finalize the area decision status.
 Date: 2026-11-18
 Context: Review item 16. Answers WEB-Q05. A student can delete their bank but not their account, matches, or resume PDFs.
 Decision: This version has no account deletion. On request, the team deletes a student's data by hand: the Cognito user, the items under `USER#{sub}`, their private sources, and their objects under `uploads/` and `resume/`.
@@ -491,6 +492,7 @@ Graham Cohick has accepted every contract this area uses. "Agreed" below means t
 Answered: WEB-Q01 (EB-018; EB-I01 accepted), WEB-Q02 (EB-019; the EB-I03 extension accepted), WEB-Q03 (JDM-010 and JDM-I05 accepted; the API's side is WEB-013; WEB-Q08 follows from it), WEB-Q04 and WEB-Q06 (JDM-009; JDM-I01 accepted), WEB-Q07 (the task IDs are now in `implementation-plan.md`). Graham Cohick accepted each answer on 2026-11-19. The entries stay below as the record.
 
 - **WEB-Q08: Which record triggers upload regeneration?** The student's "regenerate?" choice is now stored twice. `create_upload(sub, regenerate)` puts it on the upload record (EB-019), and the API writes a `regen-upload:{docId}` work record when it is true (JDM-I05). EB-019 says the dispatcher reads the choice through `upload_status`, "one record, not two". JDM-I05 says the dispatcher works from the work record, which is the only one its recovery scan can find. The two writes aren't atomic, so they can disagree. Proposed (WEB-013): the work record is the trigger, and the value on the upload record is for display only. If that's right, EB-019's wording should say so. If the upload record is meant to be the trigger, JDM-I05 needs a way for the dispatcher to find it.
+  - **Luke's answer (2026-11-21):** Agree WEB-013: the work record alone triggers regeneration; upload.regenerate is display only. Persist work before returning upload credentials; on persistence failure return a retryable error without the form, and resolve uncertain writes with the same docId/workId. JDM-011 records the reasoning and proposed expired-status alignment. Ryan must confirm EB-019 wording; the DB amendment remains pending.
   - Owner: Luke Campbell, Ryan Fusco
   - Blocks: WEB-T10, and the regeneration amendment to DB-I04
 
@@ -535,4 +537,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| _None yet._ | | |
+| JDM-011 / DB-Q10 | job-discovery-and-matching/architecture.md; database/architecture.md | Review trigger/expiry clarification and DB regeneration amendment; keep WEB-T10 and diagram aligned after agreement. |

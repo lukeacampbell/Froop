@@ -16,13 +16,14 @@ This plan builds the design in `architecture.md`: decisions DEL-001 to DEL-020 (
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| Luke Campbell accepting DB-I03 (Graham Cohick and Ryan Fusco have) | T04, T05, T06 |
-| Graham Cohick and Luke Campbell accepting DB-I01 (Ryan Fusco has) | T06 |
-| Luke Campbell accepting OPS-001 to OPS-010 (shared `build-and-operation`) | T07 |
+| EB-T01 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
+| EB-T01 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
+| EB-T01 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
 | `experience-bank` building its package (EB-T01) | T04 (T01 to T03 use fixtures until then) |
 
 ## Building the resume
 
+**Dependency update (2026-11-21):** Luke answered the shared approvals. DB-I01/I03/I04 base, DB-001, OPS decisions and OPS-I05 are Accepted. DB-I02 awaits DB-Q10; OPS-I01 to I04 await Ryan. Existing task sequence/criteria are unchanged; the owner should finalize readiness against these blockers.
 ### DEL-T01: The Froop resume template
 Depends on: DEL-001, DEL-006, EB-015
 Acceptance criteria:
@@ -65,7 +66,7 @@ Acceptance criteria:
 5. It updates `renderStatus`, `pdfKey`, `generation`, and `requestId` with writes conditional on `generation`.
 6. For an instant-mode `new_match`, it hands off to the Notifier. A `regenerate` request never triggers an email.
 7. Logs carry `sub`, `postingKey`, and `generation`, and never contain resume text.
-Status: Blocked (DB-I03 needs Luke Campbell's acceptance; EB-T01)
+Status: Blocked (DB-I03 Accepted (2026-11-21); EB-T01)
 
 ### DEL-T05: Instant emails, sent at most once
 Depends on: DEL-T04, DEL-004, DEL-018, DB-I03, DB-I05, OPS-008
@@ -74,7 +75,7 @@ Acceptance criteria:
 2. `notifyStatus` moves `pending` → `sending` with a conditional write before sending. If that write fails, nothing is sent.
 3. After SES accepts the message, `notifyStatus` moves to `sent`. A match stuck in `sending` for more than 15 minutes is marked `failed` and never resent.
 4. A recipient that isn't verified in the SES sandbox ends as `failed`, with the SES reason recorded.
-Status: Blocked (DB-I03 and OPS-008 need Luke Campbell's acceptance; DB-I05 is Accepted)
+Status: Planned (DB-I03, OPS-008 and DB-I05 Accepted; execution still waits for Phase 2 and predecessor tasks)
 
 ### DEL-T06: Digest schedules and digest emails
 Depends on: DEL-T05, DEL-011, DEL-019, DEL-020, DB-I01, DB-I03
@@ -85,7 +86,7 @@ Acceptance criteria:
 4. **Pending matches** are moved to the next send's bucket.
 5. **Skipped and failed matches** lose the mark, and no email is sent.
 6. A run repeated for the same send sends nothing twice.
-Status: Blocked (DB-I03 needs Luke Campbell's acceptance; DB-I01 needs Graham Cohick's and Luke Campbell's)
+Status: Planned (DB-I01/I03 Accepted; execution still waits for Phase 2 and predecessor tasks)
 
 ## Infrastructure
 
@@ -97,4 +98,4 @@ Acceptance criteria:
 3. **Renderer role:** read the bank through the package, write `resume/`, and update match delivery fields.
 4. **Notifier role:** query GSI2, update delivery fields, read the signing key, and send through SES.
 5. Alarms cover render-queue DLQ depth, Renderer errors, and SES bounces.
-Status: Blocked (shared `build-and-operation` items need Luke Campbell's acceptance)
+Status: Blocked (OPS-I01 to I04 still await Ryan; Luke has accepted)

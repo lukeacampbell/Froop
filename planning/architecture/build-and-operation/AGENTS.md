@@ -14,7 +14,7 @@ Build and Operation makes sure every part of Froop can be built, deployed, watch
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-19
+Last reviewed: 2026-11-21
 
 ## Files
 

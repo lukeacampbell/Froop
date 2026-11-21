@@ -172,7 +172,7 @@ Questions that span areas or affect the whole architecture. They use the `SYS-Q`
   - Owner: group (Ryan, Graham, Luke)
   - Blocks: final shared RFC goal/demo signoff, not the JDM draft.
 
-- **SYS-Q05: Add "no account deletion" to the RFC's Non-Goals?** A student can delete their experience bank, but nothing deletes their account, matches, or resume PDFs. **Proposed answer (Graham Cohick, 2026-11-18, WEB-012):** list account deletion as a non-goal for this version, and delete a student's data by hand on request. **Ryan Fusco agrees (2026-11-19).** Waiting for: Luke Campbell.
+- **SYS-Q05: Add "no account deletion" to the RFC's Non-Goals?** A student can delete their experience bank, but nothing deletes their account, matches, or resume PDFs. **Proposed answer (Graham Cohick, 2026-11-18, WEB-012):** list account deletion as a non-goal for this version, and delete a student's data by hand on request. **Ryan Fusco agrees (2026-11-19). Luke Campbell agrees (2026-11-21):** omit self-service account deletion to keep the demo focused; retain manual deletion on request. Resolved: all three agree.
   - Owner: group
   - Blocks: WEB-012, and the Non-Goals section of the revised RFC
 

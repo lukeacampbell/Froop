@@ -16,7 +16,7 @@ Every area depends on this design, so it's coordinated in one place rather than 
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-19
+Last reviewed: 2026-11-21
 
 ## Files
 

@@ -16,9 +16,9 @@ This plan builds the design in `architecture.md`: decisions EB-001 to EB-019 (Ac
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| Graham Cohick and Luke Campbell accepting DB-I01 and DB-I02 (Ryan Fusco has) | T01, T02, T05 |
-| Graham Cohick and Luke Campbell accepting the EB-I03 extension (EB-019) | T02 |
-| Luke Campbell accepting OPS-001 to OPS-010 (shared `build-and-operation`) | T07 |
+| DB-I02 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
+| DB-I02 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
+| DB-I02 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
 | Shared acceptance of DB-I04 and OPS-I05 (JDM-T05 builds the reservation package) | T06 |
 
 ## Parsing core
@@ -51,6 +51,7 @@ Status: Planned
 
 ## Package and upload contract
 
+**Dependency update (2026-11-21):** Luke answered the shared approvals. DB-I01/I03/I04 base, DB-001, OPS decisions and OPS-I05 are Accepted. DB-I02 awaits DB-Q10; OPS-I01 to I04 await Ryan. Existing task sequence/criteria are unchanged; the owner should finalize readiness against these blockers.
 ### EB-T01: Build the experience-bank package
 Depends on: EB-010, EB-I03, EB-008, DB-I02, OPS-007
 Acceptance criteria:
@@ -61,7 +62,7 @@ Acceptance criteria:
 5. `upload_status(sub, docId=None)` returns one of `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`, or `expired`, with a reason when failed. It reports `expired` when `expiresAt` has passed with no file. Given a `docId`, it also says whether that upload is the current bank.
 6. `supported_templates()` returns the macro list used by T04 and by the delivery template (DEL-001).
 7. Every function is scoped to the given `sub`, and no function returns another student's items.
-Status: Blocked (DB-I01 and DB-I02 need Graham Cohick's and Luke Campbell's acceptance)
+Status: Blocked (DB-I02 awaits DB-Q10 expiry clarification; DB-I01 Accepted)
 
 ### EB-T02: Issue upload links (`create_upload`)
 Depends on: EB-T01, EB-018, EB-019, EB-I01, OPS-I02
@@ -70,7 +71,7 @@ Acceptance criteria:
 2. It returns `{docId, url, fields, expiresAt}` for a presigned POST whose policy fixes the key `uploads/{sub}/{docId}.tex`, the content type `application/x-tex`, a size of 1 byte to 1 MB, and a 15-minute expiry.
 3. A test confirms S3 rejects a file over 1 MB, a file with another content type, and a file sent to a different key.
 4. Creating an upload doesn't change the current bank.
-Status: Blocked (EB-T01, and the EB-019 extension needs Graham Cohick's and Luke Campbell's acceptance)
+Status: Blocked (EB-T01 / DB-Q10; EB-019 consumer acceptance complete, Ryan to finalize status)
 
 ## Parser pipeline
 
@@ -93,7 +94,7 @@ Acceptance criteria:
 3. Bedrock must return a category and exact spans. A span that isn't an exact substring of the upload is rejected and logged, never stored.
 4. If the reservation is deferred, the sections are stored as `unclassified`, the status becomes `parsed_with_unclassified`, and a retry is scheduled for `nextAttemptAt`. If it's `blocked_configuration`, the status says so.
 5. Actual tokens and estimated cost are logged as metrics, without resume text.
-Status: Blocked (JDM-T05, which needs DB-I04 and OPS-I05 accepted)
+Status: Blocked (JDM-T05; DB-I04 base and OPS-I05 now Accepted)
 
 ### EB-T07: Wire the parser Lambda
 Depends on: EB-T05, EB-T06, OPS-004, OPS-I01, OPS-I03, OPS-I04, OPS-T04, OPS-T05
@@ -103,4 +104,4 @@ Acceptance criteria:
 3. The parser's IAM role can only read `uploads/`, write `DOC#` items, call the configured Bedrock model, and use the cost reservation records.
 4. Logs are JSON with `sub` and `docId`, and never contain resume text. Metrics count uploads parsed, failed, and left unclassified.
 5. A retried S3 event for an upload already processed changes nothing.
-Status: Blocked (shared `build-and-operation` items need Luke Campbell's acceptance)
+Status: Blocked (OPS-I01 to I04 still await Ryan; Luke has accepted)

@@ -69,7 +69,7 @@ _None yet._
 ## Decisions
 
 ### OPS-001: Lock Terraform state with the S3 backend's native lockfile
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q01. The RFC (p.7) asks for "a lock file" so two people can't apply at the same time.
 Decision: Use the S3 backend's native locking (`use_lockfile = true`, Terraform 1.10 or later) on the versioned, encrypted state bucket that bootstrap creates. Each environment has its own state key.
@@ -79,7 +79,7 @@ Consequences:
 - Everyone has to use Terraform 1.10 or later. Pin the version in `infra/` and in CI.
 
 ### OPS-002: Hourly spend caps of $1 per user and $5 for the platform, set by configuration
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q02. The RFC (p.5, p.8) caps "Bedrock spend per hour" and promises "spend limits". The project is on a tight budget, and the caps will probably need tuning.
 Decision:
@@ -97,7 +97,7 @@ Consequences:
 - **Other AWS costs** (Lambda, S3, DynamoDB) can't be capped per hour. They're covered by the monthly alert.
 
 ### OPS-003: Keep scraper and renderer images separate, and keep other functions out of the renderer image
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area). **Partly superseded by OPS-011:** the scraper image no longer contains Chromium or Playwright. The renderer separation still stands.
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21). **Partly superseded by OPS-011:** the scraper image no longer contains Chromium or Playwright. The renderer separation still stands.
 Date: 2026-11-17
 Context: Answers part of OPS-Q03. Chromium (the Scraper) and TeX (the Renderer) make very large images. Putting the parser, Matcher, or Notifier in the renderer image would make those functions large too, and mix responsibilities.
 Decision:
@@ -110,7 +110,7 @@ Consequences:
 - The RFC's "api, scraper, and worker images" (p.7) becomes more images. The revised RFC changes once this is accepted.
 
 ### OPS-004: One image per Lambda function, built from a shared base image
-Status: Proposed (recommendation for the rest of OPS-Q03). Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Waiting for: Luke Campbell (shared area).
+Status: Accepted (recommendation for the rest of OPS-Q03). Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers the rest of OPS-Q03: should the parser, Matcher, and Notifier have their own images, or share one?
 Decision:
@@ -125,7 +125,7 @@ Consequences:
 - Each area owns its own function's image.
 
 ### OPS-005: CI runs unit tests and Terraform checks on every pull request, and before every deploy
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q04. The RFC's `deploy.yml` builds and applies on every push to `main`, with no tests, though the diagram says "build · test · deploy".
 Decision:
@@ -142,7 +142,7 @@ Consequences:
 - Required pull-request checks on `main` should be turned on in GitHub.
 
 ### OPS-006: Start with the smallest Bedrock model in us-east-1, configurable for each task
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q06. The budget is tight, and finding the right balance of accuracy and cost will take experimenting.
 Decision:
@@ -157,7 +157,7 @@ Consequences:
 - Costs per call vary by model, so the cost counters (OPS-002) use the configured model's prices.
 
 ### OPS-007: One repository with `services/`, `libs/`, and `infra/`
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q08. The experience-bank package (EB-010) is shared by several images.
 Decision:
@@ -172,7 +172,7 @@ Consequences:
 - CI decides what to test and build from the paths that changed.
 
 ### OPS-008: Stay in the SES sandbox for now
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q05. A domain would be nice, but the sandbox is the easiest option for development and the demo.
 Decision:
@@ -186,7 +186,7 @@ Consequences:
 - The SES production access step outside Terraform (RFC p.7) is not done for now.
 
 ### OPS-009: A $50 monthly AWS budget alert, set by configuration
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q09. The group is on free-tier accounts with little money to spend, and the amount may need changing.
 Decision:
@@ -200,7 +200,7 @@ Consequences:
 - The hourly caps alone didn't fit this budget, so OPS-010 adds a daily cap.
 
 ### OPS-010: A $1.50 daily platform cap on Bedrock, set by configuration
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Accepted by: Ryan Fusco (2026-11-17), Graham Cohick (2026-11-18). Luke Campbell (2026-11-21).
 Date: 2026-11-17
 Context: Answers OPS-Q10. At the hourly platform cap (OPS-002), Bedrock could use the whole $50 monthly budget (OPS-009) in 10 hours. The project is due in under a month, and the group is spending only free-tier amounts.
 Decision:
@@ -226,7 +226,7 @@ Alternatives: Browser image and one scheduler resource per source are unnecessar
 Consequences: OPS-003's original proposal stays in the history pending group acceptance; OPS-I05 is the current proposed JDM intake. No infrastructure is provisioned during planning. Shared decisions OPS-001 to OPS-010 are not automatically accepted by this change.
 
 ### OPS-012: The dashboard lives in `web/`, and CI builds and publishes it
-Status: Proposed. Proposed by Graham Cohick. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Waiting for: Luke Campbell (shared area).
+Status: Accepted. Proposed by Graham Cohick. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Luke Campbell (2026-11-21).
 Date: 2026-11-18
 Context: Answers OPS-Q11. OPS-005 and OPS-007 cover Lambda images only, and the React dashboard is a static site served from S3 through CloudFront (RFC p.3).
 Decision:
@@ -253,7 +253,7 @@ Contract:
 - **Config:** comes from environment variables that Terraform sets: table name, bucket names, queue URLs, and the secret ARN.
 - **Environments:** pushes to `main` deploy to dev automatically. Prod deploys only when started by hand.
 - **Area resources:** each area's Lambdas, queues, roles, and alarms live in that area's Terraform module (SYS-Q03).
-Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
+Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
 
 #### OPS-I02: Storage resources
 Status: Proposed
@@ -266,13 +266,13 @@ Contract:
   - static site: served through CloudFront
 
   Each area owns the key layout of its own prefix (EB-I01, DEL-I01).
-Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
+Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
 
 #### OPS-I03: IAM and secrets
 Status: Proposed
 Consumers: all areas
 Contract: Each Lambda has its own role, granted only the permissions its area lists in the Requirements Intake. The only secret is the CloudFront signing key, stored in Secrets Manager and readable only by `api` and `notifier`. Job boards need no keys, and nothing is stored in git or in GitHub secrets.
-Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
+Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
 
 #### OPS-I04: Observability conventions
 Status: Proposed
@@ -294,10 +294,10 @@ Contract:
   - SES bounces
 
   All alarms go to SNS, which emails the team.
-Accepted by: Graham Cohick (2026-11-19). Waiting for: Ryan Fusco, Luke Campbell.
+Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
 
 #### OPS-I05: Amended JDM Requirements Intake
-Status: Proposed
+Status: Accepted
 Consumers: job-discovery-and-matching, database, delivery, web-app-and-api
 Contract:
 - Dispatcher, scraper and Matcher small container-image Lambdas; no browser dependency. One dispatcher schedule every 15 minutes, source poll interval default one hour; manual cooldown five minutes. Digest schedules are separate delivery resources.
@@ -306,7 +306,7 @@ Contract:
 - Config: table and queue names, poll/cooldown/lease limits, HTTP/response limits, ranking token limits/model ID/pricing version, cost caps, and work recovery page limits. No hardcoded model prices.
 - Metrics/alarms: poll failures, DLQ depth, oldest pending work, budget deferral, invalid model output and estimated/actual AI cost; retain JSON correlation IDs without resume text, job bodies or raw prompts.
 - Provision GSI3 and work/reservation schemas only after DB-I04 acceptance. Keep GSI1/GSI2; proposed LSI1 removal requires DB agreement before table deployment.
-Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Proposed by Luke Campbell, so every owner has now agreed; the Status line is the coordinator's to update.
+Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Luke Campbell confirms acceptance (2026-11-21).
 
 ### Consumes
 - **The table design:** DB-I01 from `database`.
@@ -328,12 +328,20 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 
 ## Open Questions
 
+**Luke's answers and reasoning (2026-11-21):**
+- OPS-001/004/005/007/012: accept native state locking, one image per function, shared bases, CI checks, the monorepo and web/ publication. They keep deployment reproducible and changes independently deployable; prod remains manual.
+- OPS-003: accept renderer isolation as amended by OPS-011. Greenhouse discovery has no Chromium/Playwright dependency.
+- OPS-002/006/008/009/010: accept configured hourly/daily caps, the cheapest model passing agreed samples in us-east-1, verified sandbox demo recipients and the monthly budget alert. No exact model is selected without evaluation. The $50 alert is not a hard AWS cap; the daily Bedrock cap leaves limited room for other AWS charges.
+- OPS-I01 to I04: Luke accepts deployment/storage contracts, least-privilege permissions and observability because every area needs a consistent operational boundary. Ryan's provider acceptance is still required.
+- OPS-Q07 and OPS-I05: confirm the amended JDM row: HTTP Greenhouse scraper, dispatcher/Matcher in ingestion, persisted recovery and delivery-owned digest schedules. Graham and Ryan have already accepted OPS-I05. The DB regeneration amendment remains separate.
+
+
 **Luke’s answer to OPS-Q07 and Matcher cap handling (2026-11-18):** confirm the amended JDM intake in OPS-I05 (HTTP-only Greenhouse scraper, dispatcher/Matcher in ingestion, no Chromium, digest schedules owned by delivery). At any cost cap, persist deferred work and its next reset time, acknowledge SQS and resume via dispatcher, per Accepted JDM-006/I04. Oversized-per-cap requests are blocked configuration, not infinite retries. This avoids paid calls after budget exhaustion and queue retry storms. Other owners must still accept shared OPS-I05; this does not blanket-approve OPS-001 to OPS-010.
 
 Answered: OPS-Q11 (OPS-012), OPS-Q01 (OPS-001), OPS-Q02 (OPS-002), OPS-Q03 (OPS-003, OPS-004), OPS-Q04 (OPS-005), OPS-Q05 (OPS-008), OPS-Q06 (OPS-006), OPS-Q08 (OPS-007), OPS-Q09 (OPS-009), OPS-Q10 (OPS-010). Each answer is Proposed until every owner accepts it.
 
 - **OPS-Q07: Are the RFC-derived Requirements Intake rows right?** Luke Campbell and Graham Cohick need to confirm the rows for their areas.
-  - *Graham Cohick confirms the `web-app-and-api` row (2026-11-18), as revised from WEB-001 to WEB-011. Its regeneration queue is pending WEB-Q03. Waiting for: Luke Campbell, for his area's row.*
+  - *Graham Cohick confirms the `web-app-and-api` row (2026-11-18), as revised from WEB-001 to WEB-011. Its regeneration queue is pending WEB-Q03. Luke confirms his amended row in OPS-I05 (2026-11-21).*
   - Owner: Luke Campbell, Graham Cohick
   - Blocks: OPS-I02, OPS-I03
 - **OPS-Q11: Where does the React dashboard live in the repository, and how is it built and published?** Raised for Graham Cohick (2026-11-18) while accepting OPS-005 and OPS-007. OPS-007 gives `services/<name>/` to "each Lambda's code and Dockerfile", and OPS-005's `ci.yml` and `deploy.yml` only test and build Lambda images. The dashboard is a static site served from S3 through CloudFront (RFC p.3), not a Lambda, so neither decision says where its source goes, which checks run on it in pull requests, or which step builds it, uploads it to the static-site bucket, and invalidates CloudFront. Accepting OPS-005 and OPS-007 doesn't depend on the answer: it adds to them. *Proposed answer (Graham Cohick, 2026-11-18): OPS-012.*

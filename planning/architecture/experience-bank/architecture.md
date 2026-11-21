@@ -383,6 +383,7 @@ Contract:
 Accepted by: —
 
 #### EB-I03: Experience bank package
+**Luke's extension acceptance (2026-11-21):** Accept create_upload and upload_status(sub, docId), the fixed status list and isCurrentBank: they let JDM wait for the requested successful current bank without reading DOC items. All consumers have accepted the extension; Ryan can finalize its status. WEB-Q08 separately clarifies that the WORK record triggers regeneration, and DB-Q10 separates link expiry from data retention.
 Status: Accepted (base contract). The EB-019 extension is Proposed until the consumers accept it.
 Consumers: web-app-and-api (`GET /experience`, delete), job-discovery-and-matching (the Matcher), delivery (the Renderer)
 Contract: A Python package owned by this area (EB-010). It is the only supported way to use the bank:
@@ -395,7 +396,7 @@ Contract: A Python package owned by this area (EB-010). It is the only supported
 - `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
-Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list are Proposed. Graham Cohick accepted the extension (2026-11-19, consumer: web-app-and-api). Waiting for: Luke Campbell.
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list are Proposed. Graham Cohick accepted the extension (2026-11-19, consumer: web-app-and-api). Luke Campbell accepts the extension (2026-11-21; reasoning above).
 
 ### Consumes
 - **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), the section categories, entries, and skill categories (EB-016), and the upload record's new statuses, `expiresAt`, and `regenerate` (EB-019).
@@ -410,7 +411,7 @@ Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, sinc
 - **EB-Q10: The API, and the shared sections of the RFC, still need updating for EB-001 and EB-002.** The revised RFC (`architecture/revised-rfc/`) now covers this area's sections: the Summary, Goal 3, Bedrock's role, the Data Model, the upload file type, and Demo step 1. Still open:
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
     - *Answered by Graham Cohick (2026-11-18): it becomes `DELETE /experience` (WEB-001, Accepted). The revised RFC is updated.*
-  - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections. *Ryan Fusco asked Graham Cohick and Luke Campbell to confirm (2026-11-19), through their Requests From Other Areas tables. Graham Cohick confirms the wording (2026-11-19). Waiting for: Luke Campbell.*
+  - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections. *Ryan Fusco asked Graham Cohick and Luke Campbell to confirm (2026-11-19), through their Requests From Other Areas tables. Graham Cohick confirms the wording (2026-11-19). Luke Campbell confirms the Summary, Goal 3 and Demo step 1 (2026-11-21): one LaTeX resume and verbatim bullets match the agreed Matcher inputs and avoid text generation. Shared wording is now agreed.*
   - Owner: Graham Cohick (API), group (shared sections)
   - Blocks: EB-I01 acceptance
 
@@ -422,3 +423,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 |---|---|---|
 | WEB-Q08 | `web-app-and-api/architecture.md` | With Luke Campbell: confirm that the JDM-I05 work record, not the `regenerate` value on the upload record (EB-019), is what triggers upload regeneration, and say what that value is then for. |
 | _None yet._ | | |
+| DB-Q10 | database/architecture.md | Ryan: agree a separate upload link deadline from table TTL; active upload metadata must survive link expiry. |

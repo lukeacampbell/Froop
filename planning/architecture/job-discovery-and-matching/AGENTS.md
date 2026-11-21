@@ -14,7 +14,7 @@ Find Greenhouse jobs from subscribed boards and select the student’s existing 
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-18
+Last reviewed: 2026-11-21
 
 ## Files
 

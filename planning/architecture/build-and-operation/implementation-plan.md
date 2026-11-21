@@ -3,7 +3,7 @@
 Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This is a shared area, so every owner must agree to changes to this plan.
 Date: 2026-11-19. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: decisions OPS-001 to OPS-012 and interfaces OPS-I01 to OPS-I05. OPS-011 is Accepted. The rest have Ryan Fusco's and Graham Cohick's acceptance and wait on Luke Campbell's, except OPS-I05, which waits on Graham Cohick's. No infrastructure exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: decisions OPS-001 to OPS-012 and interfaces OPS-I01 to OPS-I05. OPS-001 to OPS-012 and OPS-I05 are Accepted as of 2026-11-21. Luke has accepted OPS-I01 to I04; those still await Ryan. No infrastructure exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision or interface still needs agreement before the task can be built. It doesn't mean the task was tried and failed.
 
@@ -17,9 +17,7 @@ This plan builds the design in `architecture.md`: decisions OPS-001 to OPS-012 a
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| Luke Campbell accepting OPS-001 to OPS-010 and OPS-012 | T01 to T10 |
-| Graham Cohick accepting OPS-I05 | T03, T05 (the JDM functions) |
-| Graham Cohick and Luke Campbell accepting DB-I01 and DB-001 (shared `database`; Ryan Fusco has) | T04 (the table) |
+| Ryan Fusco accepting OPS-I01 to I04 | T04 to T08 |
 
 ## Foundations
 
@@ -29,7 +27,7 @@ Acceptance criteria:
 1. Top-level folders: `services/<name>/` (one per Lambda image), `libs/<name>/` (shared Python packages), `infra/` (Terraform), and `web/` (the dashboard).
 2. Terraform's version is pinned to 1.10 or later in `infra/`, and Python's version is pinned for every service.
 3. A README explains how to run the unit tests for one service, for one library, and for all of them.
-Status: Blocked (OPS-007 and OPS-012 need Luke Campbell's acceptance)
+Status: Planned
 
 ### OPS-T02: Bootstrap each AWS account
 Depends on: OPS-T01, OPS-001, OPS-004, OPS-005, OPS-006
@@ -39,7 +37,7 @@ Acceptance criteria:
 3. Everything is in `us-east-1`.
 4. Running bootstrap a second time changes nothing.
 5. Two people applying at the same time can't corrupt the state. A test confirms the second apply waits or fails on the lock.
-Status: Blocked (OPS-001, OPS-004, OPS-005, and OPS-006 need Luke Campbell's acceptance)
+Status: Planned
 
 ### OPS-T03: Terraform modules and environments
 Depends on: OPS-T02, SYS-Q03, OPS-011, OPS-002, OPS-006, OPS-009, OPS-010
@@ -57,7 +55,7 @@ Acceptance criteria:
    - the Bedrock model for each task
    - the sign-up switch and CORS origins (from `web-app-and-api`)
 4. Each module exposes the names its services need (the table, buckets, queues, and secret ARN) as outputs, passed to Lambdas as environment variables (OPS-I01).
-Status: Blocked (OPS-002, OPS-006, OPS-009, and OPS-010 need Luke Campbell's acceptance; OPS-I05 needs Graham Cohick's)
+Status: Planned
 
 ### OPS-T04: Data resources
 Depends on: OPS-T03, DB-T01, OPS-I02, EB-018, DEL-007
@@ -67,7 +65,7 @@ Acceptance criteria:
 3. **Resumes bucket:** private, with no expiry rule. An optional move to Standard-IA after 30 days is allowed. Served only through CloudFront OAC.
 4. **Static-site bucket:** private, served only through CloudFront.
 5. Public access is blocked on all three buckets.
-Status: Blocked (DB-T01; OPS-I02 needs Luke Campbell's acceptance)
+Status: Blocked (OPS-I02 awaits Ryan)
 
 ### OPS-T05: Images and the deployment contract
 Depends on: OPS-T01, OPS-T02, OPS-003, OPS-004, OPS-011, OPS-I01
@@ -76,7 +74,7 @@ Acceptance criteria:
 2. The `scraper` image has no browser. The `renderer` image is the only one with TeX.
 3. Each image declares its handler entry point and reads all configuration from environment variables. A missing variable makes the function fail at start-up with a clear message.
 4. Images are tagged with the commit SHA.
-Status: Blocked (OPS-003, OPS-004, and OPS-I01 need Luke Campbell's acceptance)
+Status: Blocked (OPS-I01 awaits Ryan)
 
 ### OPS-T06: CI and deployment workflows
 Depends on: OPS-T01, OPS-T02, OPS-T05, OPS-005, OPS-012
@@ -91,7 +89,7 @@ Acceptance criteria:
    Prod runs the same steps only when started by hand.
 3. Both workflows authenticate through OIDC only. No AWS keys are stored in GitHub.
 4. Pull requests to `main` require `ci.yml` to pass.
-Status: Blocked (OPS-005 and OPS-012 need Luke Campbell's acceptance)
+Status: Blocked (OPS-T05 depends on OPS-I01 acceptance)
 
 ## Security, observability, and cost
 
@@ -102,7 +100,7 @@ Acceptance criteria:
 2. The CloudFront signing key is stored in Secrets Manager. Only the `api` and `notifier` roles can read it.
 3. A check in CI fails if any role uses `"Resource": "*"` for data access.
 4. No secret appears in the repository, in CI settings, or in Terraform output.
-Status: Blocked (OPS-I03 needs Luke Campbell's acceptance)
+Status: Blocked (OPS-I03 awaits Ryan)
 
 ### OPS-T08: Logging, metrics, dashboard, and alarms
 Depends on: OPS-T03, OPS-I04
@@ -116,7 +114,7 @@ Acceptance criteria:
    - API 5xx
    - SES bounces
    - 80% of the hourly and daily Bedrock caps
-Status: Blocked (OPS-I04 needs Luke Campbell's acceptance)
+Status: Blocked (OPS-I04 awaits Ryan)
 
 ### OPS-T09: The monthly budget alert
 Depends on: OPS-T03, OPS-009
@@ -124,7 +122,7 @@ Acceptance criteria:
 1. An AWS Budgets cost budget of `monthly_budget_usd` (default: $50) alerts at the `budget_alert_percents` (default: 50, 80, and 100 percent of actual spend) and at 100 percent of forecast spend.
 2. Alerts go to the team's SNS topic.
 3. Changing the amount means editing `tfvars` and applying, with no code change.
-Status: Blocked (OPS-009 needs Luke Campbell's acceptance)
+Status: Planned
 
 ### OPS-T10: Document and do the manual steps
 Depends on: OPS-T02, OPS-006, OPS-008
@@ -137,4 +135,4 @@ Acceptance criteria:
    - redrive a DLQ
 2. A teammate following the runbook from a fresh clone gets a working dev environment.
 3. The runbook says how to delete a student's data by hand (WEB-012), pending SYS-Q05.
-Status: Blocked (OPS-006 and OPS-008 need Luke Campbell's acceptance)
+Status: Planned

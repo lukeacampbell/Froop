@@ -57,7 +57,9 @@ _None yet._
 ## Decisions
 
 ### DB-001: The table uses on-demand capacity
-Status: Proposed. Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Waiting for: Luke Campbell (shared area).
+Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19), Luke Campbell (2026-11-21).
+**Luke's reasoning:** On-demand fits intermittent discovery, upload and digest traffic without an initial capacity-tuning task. It does not impose a hard spending limit.
+Status: Accepted (2026-11-21)
 Date: 2026-11-19
 Context: Answers DB-Q04. Traffic comes in bursts (scrapes, digests, uploads) and the table is idle most of the day (RFC p.3).
 Decision: The table and its three GSIs use DynamoDB on-demand capacity in every environment.
@@ -69,7 +71,7 @@ Consequences:
 
 ## Access Patterns
 
-Every way the data is read or written. They come from the RFC (pp.4–5) and the decisions since. Every row is `Proposed`. Nothing goes into the table design unless a row here needs it.
+Every way the data is read or written. They come from the RFC (pp.4–5) and the decisions since. Rows follow their defining contracts; DB-I02 and the regeneration amendment remain Proposed. Nothing goes into the table design unless a row here needs it.
 
 | ID | Access pattern | Needed by | Served by | Source |
 |---|---|---|---|---|
@@ -96,7 +98,7 @@ Every way the data is read or written. They come from the RFC (pp.4–5) and the
 
 ## Item Types
 
-The item types listed in RFC p.5. Every row is `Proposed`.
+The item types listed in RFC p.5. Rows follow their defining contracts; DB-I02 and the regeneration amendment remain Proposed.
 
 | Item type | `PK` | `SK` | Written by (area) | Read by | Definition |
 |---|---|---|---|---|---|
@@ -117,7 +119,8 @@ The item types listed in RFC p.5. Every row is `Proposed`.
 ### Provides
 
 #### DB-I01: Table conventions
-Status: Proposed
+**Luke's reasoning (2026-11-21):** One table and three access-pattern indexes avoid a second store; GSI3 preserves stable match keys while supporting the date-ordered feed.
+Status: Accepted (2026-11-21)
 Consumers: all areas, build-and-operation (provisions it)
 Contract:
 - **Table:** a single table with generic key attributes `PK` and `SK`, using the formats in Item Types.
@@ -128,9 +131,10 @@ Contract:
 - **TTL:** postings expire 30 days after they were last seen.
 
 Every item carries an item-type attribute. A new item type needs a new row in Item Types before anything writes it.
-Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Waiting for: Luke Campbell.
+Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Luke Campbell (2026-11-21).
 
 #### DB-I02: Experience items
+**Luke's answer (2026-11-21):** Agree bank ownership, verbatim fields, current-version pointer and fixed statuses. Withhold final schema acceptance until DB-Q10 separates upload-link expiry from TTL. Canonical/dictionary fields are deferred with EB-007, not required in v1.
 Status: Proposed
 Written by: experience-bank
 Consumers: experience-bank only. The Matcher, the Renderer, and the API read and delete through the experience bank package (EB-I03, EB-010).
@@ -146,10 +150,11 @@ Contract: Item types under `PK=USER#{sub}`, `SK=DOC#…`:
 - **Current-upload pointer:** a per-user item naming the current `docId` (EB-008, Proposed).
 
 The exact sort-key formats follow DB-I01. `source` and `text` are never modified after they're written. A new upload replaces the whole set (EB-002).
-Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank), Graham Cohick (2026-11-19). Waiting for: Luke Campbell.
+Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank), Graham Cohick (2026-11-19). Luke answered 2026-11-21: final acceptance awaits DB-Q10.
 
 #### DB-I03: Match delivery state
-Status: Proposed
+**Luke's reasoning (2026-11-21):** Conditional delivery updates protect current generations; S3 history avoids an ever-growing item. Matcher-owned digest marks agree with JDM-007.
+Status: Accepted (2026-11-21)
 Written by: delivery (on Match items, which job-discovery-and-matching writes). The digest mark is the exception: the Matcher sets it (DEL-011).
 Consumers: web-app-and-api (shows the state), job-discovery-and-matching
 Contract: Attributes on `USER#{sub}` / `MATCH#{postingKey}`:
@@ -160,10 +165,11 @@ Contract: Attributes on `USER#{sub}` / `MATCH#{postingKey}`:
 - the GSI2 keys that mark a match as waiting for a digest (format above, DEL-020). The Matcher writes them when it creates the match (for hourly and daily students). The Notifier removes them after sending, or when the match was skipped or failed, and moves still-pending matches to the next window's bucket (DEL-011, DEL-020).
 
 Writes are conditional updates, so a duplicate SQS message changes nothing.
-Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19, writer of the delivery fields). Waiting for: Luke Campbell.
+Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19, writer of the delivery fields). Luke Campbell (2026-11-21).
 
 #### DB-I04: Greenhouse discovery, durable work and budget records
-Status: Proposed (Luke's design recommendation, 2026-11-18; all shared owners must agree)
+**Luke's acceptance scope (2026-11-21):** Accept the base contract: durable work, paginated recovery, immutable snapshots and transactional cost reservations give retries a recoverable result. The pending regeneration amendment still requires separate shared approval after WEB-Q08. DB-I01/I03 are now Accepted; DB-I02 remains Proposed.
+Status: Accepted (2026-11-21; regeneration amendment excluded)
 Consumers: job-discovery-and-matching, web-app-and-api, delivery, experience-bank, build-and-operation
 Contract:
 - **Access patterns added:** DB-AP15 list all enabled/due sources; DB-AP16 recover due work/expired leases; DB-AP17 uniquely reserve budget and atomically increment three counters; DB-AP18 checkpoint dispatcher scans. Initial implementation uses paginated filtered scans for AP15/16, with persisted cursors for AP18; do not claim this scales indefinitely.
@@ -177,7 +183,7 @@ Contract:
 - **Reservation:** `PK=USER#{sub}, SK=COSTRES#{attemptId}`; `itemType=CostReservation`, upper bound, caller, model/pricing version, window IDs, createdAt, expiry. A single transaction conditionally creates it and increments all three counters within caps. Separate invocations require separate attempt IDs. Unknown outcome consumes reservation conservatively.
 - **Matches newest first (DB-Q02):** propose a GSI3 instead of LSI1: `GSI3PK=USER#{sub}#MATCHES`, `GSI3SK={createdAt}#{postingKey}`. Keep the stable match primary key for deduplication. Projection contains keys/basic feed fields; details come from base reads. Feed is eventually consistent; return newly created match directly where immediate visibility is required.
 - **Digest index:** preserve DB-I03 ownership, but GSI2 keys and timing are defined by DB-I03/DEL-020 and agreed by Luke under JDM-007; overall shared schema approval remains pending (DB-Q09). *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
-Accepted by: Ryan Fusco (2026-11-19; the complexity risk in JDM-Q04 still stands), Graham Cohick (2026-11-19; the pending regeneration amendment below comes back to him separately). Waiting for: Luke Campbell. DB-I01, DB-I02, and DB-I03 are still Proposed; this contract supplements them rather than silently accepting them.
+Accepted by: Ryan Fusco (2026-11-19; the complexity risk in JDM-Q04 still stands), Graham Cohick (2026-11-19; the pending regeneration amendment below comes back to him separately). Luke Campbell (2026-11-21). DB-I01/I03 are Accepted; DB-I02 remains Proposed pending DB-Q10.
 
 #### DB-I05: Profile and Settings items
 Status: Accepted (2026-11-19). Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009), Ryan Fusco (2026-11-19).
@@ -244,6 +250,10 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
   - Callers update all three in one transaction, conditioned on none exceeding its cap.
   - Owner: Luke Campbell (writes the cost counters), Ryan Fusco
   - Blocks: OPS-002, OPS-010, EB-017
+
+- **DB-Q10: Separate upload-link expiry from item deletion.** Owner: Ryan Fusco (bank writer), Graham Cohick and Luke Campbell (shared schema). Blocks: final DB-I02 acceptance and DB-T02/T03.
+  - **Luke's proposed answer (2026-11-21):** Persist the 15-minute deadline as uploadExpiresAt; keep the public create_upload response's expiresAt field unchanged. Reserve the table TTL attribute expiresAt for intentional record deletion. Current upload metadata and its current-bank items have no TTL; link expiry alone must never delete them. Apply retention/cleanup only when an item is no longer current, under the bank cleanup policy.
+  - Reasoning: DB-T01 selects expiresAt as the table TTL attribute, while EB-019/DB-I02 reuse that name for the link deadline. [DynamoDB TTL documentation](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/time-to-live-ttl-how-to.html) specifies one attribute name for deletion eligibility. Luke agrees to the proposed separation; Ryan and Graham must confirm it before the shared schema is changed.
 
 ## Requests From Other Areas
 

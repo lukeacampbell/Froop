@@ -157,23 +157,39 @@ Alternatives: Colon-separated IDs, UUID-only assumptions, whole-word matching an
 Consequences: Luke accepts DB-I05 as a reader/co-owner: daily delivery, titleIncludes=[intern], empty remaining filters, 20 terms/list and 1–60 trimmed characters/term. Missing Settings means no matching work, not implicit defaults. Existing matches keep their original delivery mode. DB-I05 still needs Ryan’s acceptance. JDM-I01 remains Proposed pending Graham’s agreement to the final source contract.
 
 ### JDM-010: Route regeneration through persisted JDM work
-Status: Proposed (Luke’s concrete answer to WEB-Q03). Ryan Fusco agrees (2026-11-19). Graham Cohick agrees (2026-11-19; WEB-013), and asks which record triggers upload regeneration (WEB-Q08).
+Status: Accepted (base intake: Luke, Ryan and Graham; JDM-I05) (Luke’s concrete answer to WEB-Q03). Ryan Fusco agrees (2026-11-19). Graham Cohick agrees (2026-11-19; WEB-013), and asks which record triggers upload regeneration (WEB-Q08).
 Date: 2026-11-18
 Context: WEB-T10 needs a durable way to retain the upload choice and reach the Matcher. The parser already publishes the current bank through its package.
 Decision: Use JDM-I05 below. The API persists an upload-regeneration work record only when regenerate=true, keyed by the authenticated sub and docId, before returning the upload response. JDM’s existing dispatcher waits for that exact upload to become the successful current bank, then expands it into per-match work. The parser does not send a second regeneration event. Per-match API requests persist work before best-effort match-queue enqueue; dispatcher recovery covers a failed enqueue.
 Reasoning: Reusing the existing work store and dispatcher avoids a new queue, event service or parser-to-Matcher callback. The choice cannot disappear with a failed message send, and a failed upload cannot regenerate against the old bank.
 Alternatives: API fire-and-forget queue messages lose intent on failures; parser-triggered fanout adds a second owner and duplicate-trigger path.
-Consequences: Graham must agree API writes/idempotency semantics; Ryan must agree per-upload status lookup through EB-I03. DB-I04 and OPS-I05 must include these work fields/API permissions before implementation. This answer is reviewable but is not recorded as their approval.
+Consequences: Graham must agree API writes/idempotency semantics; Ryan must agree per-upload status lookup through EB-I03. DB-I04 and OPS-I05 must include these work fields/API permissions before implementation. Their base-intake acceptances are recorded in JDM-I05; the clarification in JDM-011 remains pending.
+
+### JDM-011: Clarify the upload regeneration trigger
+Status: Proposed cross-area clarification; Luke Campbell agrees (2026-11-21); Graham proposed this in WEB-013; Ryan confirmation pending WEB-Q08.
+Date: 2026-11-21
+Context: EB-019 describes one record, which conflicts with durable command recovery in JDM-I05.
+Decision: The WORK record is the only regeneration trigger. The upload record's regenerate flag records the student's choice for display. The API calls create_upload, then conditionally persists regen-upload:{docId} before returning the POST form when opted in. If persistence fails, return a retryable error without the upload form; an unused upload can expire safely. Resolve uncertain writes using the same docId/workId before acknowledging success. No work record means no regeneration; the parser never dispatches it.
+Reasoning: Recovery already scans durable work. This avoids a second scan of bank records and makes a failed queue send recoverable without requiring a transaction across package boundaries.
+Consequences: Continue waiting for that exact docId to parse successfully and become current. Proposed alignment with EB-019: a reported expired/failed upload terminates the command without fanout; retain the existing 24-hour timeout only as a fallback for a nonterminal upload. Superseded uploads also do not regenerate. Ryan must confirm EB-019 wording and the expiry alignment; the DB-I04 regeneration amendment still needs group approval.
+
+### JDM-012: Keep the safety mechanisms; review complexity at November end
+Status: Accepted (Luke Campbell, delegated answer, 2026-11-21)
+Date: 2026-11-21
+Context: JDM-Q04 asks what to simplify if JDM-T02/T04 slip.
+Decision: Review progress on 2026-11-30. Keep pagination, durable work recovery, conditional generation ownership and atomic budget reservations for now. If the vertical slice is late, defer optional scope first; propose any state-machine simplification for consumer review before implementation.
+Reasoning: A small source catalog does not prove the shared table fits in one scan page. Queue visibility alone does not prevent a stale worker from committing. Removing either safeguard now risks lost work or duplicate spend.
+Consequences: This is a planning checkpoint, not a scheduled automation or approval to enter Phase 2. No new service or implementation task is added.
 
 ## Interfaces
 
 ### Provides
 
 #### JDM-I01: Greenhouse sources, subscriptions and refresh
-Status: Proposed
+Status: Accepted
 Consumers: web-app-and-api
 Contract: Shared source validation accepts a token matching `[A-Za-z0-9_-]{1,128}` or HTTPS board URL on `boards.greenhouse.io` / `job-boards.greenhouse.io` with a single token path. Reject arbitrary hosts, credentials, ports, extra paths and unsupported providers; token input handles boards not covered by the URL parser. Catalog/private IDs follow Accepted JDM-009; this overrides the old JDM-002 spellings. API derives `sub` from JWT, writes sources/subscriptions (DB-I04), and authorizes catalog access or private-source ownership. Refresh persists `nextPollAt=now` subject to cooldown before best-effort queue send, so dispatcher recovers failed sends. Deletion disables future work; unsubscribe does not delete historical matches. 400 invalid source, 404 missing/not owned, 409 duplicate, 429 cooldown. Returns source state and `lastSuccessAt`/`lastErrorCode`; errors contain no resume data. Subscription creation takes effect by the next successful poll.
-Accepted by: Luke Campbell (2026-11-18, provider), Graham Cohick (2026-11-19, consumer: web-app-and-api, including the JDM-009 ID format). Both owners have accepted; the Status line is Luke Campbell's to update.
+Accepted by: Luke Campbell (2026-11-18, provider), Graham Cohick (2026-11-19, consumer: web-app-and-api, including the JDM-009 ID format).
 
 #### JDM-I02: Internal work queues
 Status: Proposed
@@ -194,7 +210,7 @@ Contract: `reserve(sub, attemptId, upperBoundMicroUsd, nowUtc)` returns `reserve
 Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-017). Accepted by: Luke Campbell (2026-11-18, provider). Shared database and build-and-operation parts follow DB-I04 and OPS-I05.
 
 #### JDM-I05: Regeneration command intake
-Status: Proposed
+Status: Accepted (base intake; WEB-Q08 clarification awaits Ryan)
 Consumers: web-app-and-api (command producer), JDM dispatcher/Matcher; experience-bank (status provider), database
 Contract:
 - Reuse USER#{sub}/WORK#{workId}; workType distinguishes upload_regenerate, per_match_regenerate and existing new_match work. API gets sub from the authenticated token. Store requestId, requestedAt, reason=regenerate, state, and targetDocId or postingKey as applicable. JDM owns state transitions after creation.
@@ -202,7 +218,7 @@ Contract:
 - Fanout selects active/unexpired/unapplied matches under JDM-007. Child work IDs derive deterministically from parent requestId and postingKey; store a continuation cursor so retries cannot lose later pages. Recheck targetDocId before each child starts; if replaced again, skip that old command. Regeneration never creates a new digest mark or email.
 - Per-match requests require an Idempotency-Key (UUID), used as requestId under the authenticated sub and postingKey. Atomically create work and claim the match’s activeRegenerationRequestId. Repeating the same key for the same match returns the same 202/requestId; another key while active returns 409; a key reused with a different target returns 409. Missing/invalid key returns 400. Ownership failure returns 404. This HTTP addition needs Graham’s agreement.
 - After commit, best-effort enqueue JDM-I02 {sub,workId}; persisted pending work is the source of truth if enqueue fails. Generation is allocated atomically when the operation is admitted; retries reuse it. Clear an active request only with a conditional requestId/generation check on terminal completion/failure. Pending render handoff must not release it prematurely.
-Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, upload-status provider: `upload_status(sub, docId)` in EB-019). Graham Cohick (2026-11-19, command producer: web-app-and-api, including the `Idempotency-Key` header; his API's side is WEB-013). Every party has accepted; the Status line is Luke Campbell's to update. One point to confirm: which record triggers upload regeneration (WEB-Q08). Shared DB/OPS contracts remain Proposed.
+Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, upload-status provider: `upload_status(sub, docId)` in EB-019). Graham Cohick (2026-11-19, command producer: web-app-and-api, including the `Idempotency-Key` header; his API's side is WEB-013). All parties accepted the base intake. WEB-Q08/JDM-011 clarification awaits Ryan; the DB regeneration amendment remains Proposed.
 
 ### Consumes
 
@@ -212,6 +228,9 @@ Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, uploa
 - API-owned settings, authenticated commands and upload-completion/regeneration signal: JDM-Q01 asks Graham for the producer contract. Use existing WEB-T07 and WEB-T10; JDM-I05 is the proposed regeneration intake.
 
 ## Open Questions
+
+**Luke's reconciliation (2026-11-21):** JDM-Q01 has producer agreement; WEB-Q08 has Luke's answer in JDM-011 and waits on Ryan. JDM-Q02 has its design answers and provider task IDs now exist (EB-T01/T02; DEL-T04 to DEL-T07). JDM-Q03: Luke accepts DB-I04 base and OPS-I05; regeneration amendments and OPS-I01 to I04 provider approval remain separate. JDM-Q04 is answered by JDM-012: retain safeguards and review on November 30.
+
 
 - **JDM-Q01:** Graham: agree JDM-I01, settings (`titleIncludes`, `titleExcludes`, `locationIncludes`, `deliveryMode`), and durable regeneration command producer contract. Upload regeneration must wait for successful bank replacement; per-match commands must authorize `sub` and use an idempotent request ID. Blocks JDM-T03/T07/T09; API task IDs now exist: WEB-T07 and WEB-T10.
   - **Luke’s answers (2026-11-18 restoration):** WEB-Q04/06 are answered by JDM-009; DB-I05 has Luke’s acceptance; WEB-Q03 has a concrete proposed contract in JDM-010/I05, awaiting Graham/Ryan.
@@ -252,6 +271,9 @@ Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, uploa
 - Current diagram includes proposals with dashed borders.
 - Area stays Draft until cross-area contracts are agreed; no phase change or application code is part of this work.
 
+### Planning update (2026-11-21)
+JDM-I01 and the base JDM-010/I05 intake now have all named acceptances. JDM-011 remains a cross-area clarification; DB-I02 has the expiry concern DB-Q10. Phase 1 and area Draft remain unchanged.
+
 ## Requests From Other Areas
 
 Update 2026-11-18: recommended answers now appear in JDM-003 to JDM-007, DB-I04 and OPS-I05. Answered Luke-owned pointers were removed on 2026-11-18; outstanding requests below still need action. Luke’s SYS-Q01/02/03 confirmations are recorded at source; other owners’ approval remains separate.
@@ -260,11 +282,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| WEB-Q08 | `web-app-and-api/architecture.md` | With Ryan Fusco: confirm that the JDM-I05 work record, not the `regenerate` value on the upload record (EB-019), is what triggers upload regeneration. |
-| DB-001 | `database/architecture.md` | As a co-owner, accept on-demand capacity for the table (answers DB-Q04). |
-| EB-I03 (EB-019 extension) | `experience-bank/architecture.md` | Accept `upload_status(sub, docId)`, which reports a specific upload and whether it is the current bank, for JDM-I05. |
-| EB-Q10 | `experience-bank/architecture.md` | Confirm the experience-bank wording in the RFC's Summary, Goal 3, and Demo step 1 (one LaTeX resume, verbatim bullets). |
-| WEB-Q03 | `web-app-and-api/architecture.md` | Luke answered with JDM-010/I05. Await Graham/Ryan’s agreement to API idempotency and per-upload bank status; no further Luke design answer pending. |
-| DB-I01 to DB-I03 | `database/architecture.md` | As a co-owner, accept the table conventions, the experience items, and the match delivery state. The Matcher writes the digest mark. |
-| OPS-001 to OPS-007, OPS-I01 to OPS-I04 | `build-and-operation/architecture.md` | As a co-owner, accept or challenge Ryan Fusco's answers: the state lock, the hourly caps, the image split, CI, the Bedrock model and region (OPS-006 sets a separate model for each Matcher task), and the repo layout. Also accept the four contracts. |
-| OPS-008 to OPS-010 | `build-and-operation/architecture.md` | As a co-owner, accept staying in the SES sandbox, the $50 monthly budget alert, and the $1.50 daily Bedrock cap. |
+| _None awaiting Luke's answer._ | | Remaining cross-owner follow-ups are recorded at their sources. |

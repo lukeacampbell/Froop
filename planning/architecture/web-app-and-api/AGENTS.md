@@ -14,7 +14,7 @@ Web App and API is how a student gets into Froop and uses it: signing in, upload
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-20
+Last reviewed: 2026-11-21
 
 ## Files
 

@@ -5,7 +5,7 @@
 | Status | Revised. It reflects Accepted decisions only. |
 | Based on | `architecture/inputs/Froop_inital_architecture.pdf` (RFC 0001, last updated 2026-11-03) |
 | Repository | https://github.com/lukeacampbell/Froop |
-| Last updated | 2026-11-19 |
+| Last updated | 2026-11-21 |
 
 This is the current version of the Froop architecture proposal. It starts from the submitted RFC and applies every **Accepted** decision from `planning/architecture/<area>/architecture.md`. Text marked *(pending XX-Q00)* is still as originally submitted, because the open question that would change it isn't answered yet.
 
@@ -88,6 +88,8 @@ Internship postings are spread across hundreds of job boards, and tailoring a re
 
 ### Non-Goals
 
+- No self-service account deletion in this version; the team handles data deletion manually on request (SYS-Q05; all three owners agree).
+
 No mobile app, No AI-written resume text, No sharing user-added sources between users
 
 ## Architecture
@@ -145,18 +147,19 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 - **Upload status:** an upload records its status: `awaiting_file` (link issued), `pending` (file arrived), `parsed`, `parsed_with_unclassified` (when the Bedrock cost cap was reached), or `failed`. A link that's never used reports `expired`, and a student who never uploaded reports `none` (EB-019).
 - **Replacing the bank:** a new upload's items are written under its own `docId` and become current in one pointer switch, so no reader ever sees a half-replaced bank (EB-008). Every section is labeled with a category, and skills keep their own categories (EB-016).
 - **postingKey (JDM-008):** `gh.{boardToken}.{jobPostId}`. The same Greenhouse post reached through catalog/private sources has one identity; distinct provider post IDs stay distinct. Conditional puts block duplicate postings and matches.
-- **Postings:** store title, company, location, full description, apply link, and the sources that listed them. Postings expire 30 days after last seen.
+- **Postings:** public provider records store title, company, location, description and apply link; source/subscription records hold membership separately. Postings expire 30 days after last seen; readers check expiry without waiting for TTL deletion (DB-I04).
+- **Capacity and durable work:** on-demand table and GSIs (DB-001). DB-I04 defines durable WORK records, dispatcher checkpoints and cost reservations. Pending work has no TTL; recovery scans are paginated. Bank schema expiry clarification remains pending DB-Q10; the regeneration amendment remains separately pending WEB-Q08.
 - **Indexes:**
-  - GSI1: a source's subscribers, and all catalog sources
-  - GSI2: matches waiting for a digest
-  - LSI1: matches by created date *(pending DB-I01: every owner agrees to replace it with GSI3, a matches-by-date index (DB-Q02), but the table conventions aren't accepted as a whole yet)*
+  - GSI1: catalog sources, private sources, source subscribers and board postings (DB-I01/I04).
+  - GSI2: matches waiting for the next hourly UTC or daily 13:00 UTC digest window (DB-I03; DEL-020).
+  - GSI3: matches by created date; stable match primary keys remain unchanged. No LSI (DB-I01/I04).
 
 ### Accepted JDM handoffs (2026-11-18)
 
-- JDM-009 defines dot-separated source IDs (base64url owner key for private sources) and normalized literal substring filters. The intern default matches Internship, with Internal documented as a possible false positive. DB-I05 has Graham/Luke agreement and still needs Ryan’s shared-schema acceptance.
+- JDM-009 defines dot-separated source IDs (base64url owner key for private sources) and normalized literal substring filters. The intern default matches Internship, with Internal documented as a possible false positive. DB-I05 is Accepted by all three owners.
 
-- JDM-I03 carries ranked bank IDs plus request ID and generation; regeneration sends no email. JDM-007 agrees next-hour UTC / daily 13:00 UTC digest marks at match creation, targeting strictly future windows. Shared DB schema approval remains separate.
-- JDM-006/I04 reserve a conservative upper bound against user-hour, platform-hour and platform-day caps before a Bedrock attempt. Exhausted caps persist deferred work until the relevant reset; uncertain attempts remain charged conservatively. DB/OPS provisioning is still subject to shared agreement.
+- JDM-I03 carries ranked bank IDs plus request ID and generation; regeneration sends no email. JDM-007 agrees next-hour UTC / daily 13:00 UTC digest marks at match creation, targeting strictly future windows. DB-I03 delivery state is Accepted.
+- JDM-006/I04 reserve a conservative upper bound against user-hour, platform-hour and platform-day caps before a Bedrock attempt. Exhausted caps persist deferred work until the relevant reset; uncertain attempts remain charged conservatively. DB-I04 base and OPS-I05 are Accepted; implementation awaits Phase 2.
 - JDM-008 uses EB-I03 as the sole Matcher bank interface; no term resolver/dictionary dependency in v1. Posting snapshots survive posting expiry; PDF history comes from S3, not a second growing database list.
 
 ### S3
@@ -167,7 +170,7 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 
 ## API
 
-Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers pages are no longer supported. *(pending JDM-I01: source validation and ownership rules)*
+Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers pages are no longer supported. Source validation and ownership follow Accepted JDM-I01: validated board tokens/recognized Greenhouse URLs, authenticated user ownership and durable refresh intake.
 
 | Method | Path | Auth Required? | Description |
 |---|---|---|---|
@@ -198,6 +201,8 @@ Errors:
 
 ## Infrastructure as Code
 
+Accepted OPS choices (2026-11-21): services/, libs/, infra/ and web/ share one repository. Pin Terraform 1.10 or later with native S3 state locking (OPS-001). Use us-east-1 and configurable models per parser/ranking task; select the cheapest model that passes the agreed samples (OPS-006). Keep scraper and renderer images separate; scraper has no browser (OPS-003/011). Configure $1/user-hour, $5/platform-hour and $1.50/platform-day Bedrock caps, plus a $50 monthly AWS budget alert (OPS-002/009/010). Alerts do not stop AWS spending.
+
 **Modules.** Terraform has five modules that match how we split the work:
 - `data`: the DynamoDB table and S3 buckets
 - `ingestion`
@@ -209,14 +214,16 @@ Each module creates its own Lambdas, queues, roles, and alarms.
 
 **Environments and state.** `envs/dev` and `envs/prod` use the same modules with different settings. A small bootstrap setup, run once by hand, creates the state bucket, the GitHub OIDC provider, the CI roles, and the ECR repositories. State is stored in a versioned, encrypted S3 bucket. Each environment has its own state file, and a lock file stops two people from applying at the same time.
 
-**Not in Terraform.** SES production access is a request to AWS support. The job catalog is data, so a seed script loads it from a JSON file in the repo.
+**Not in Terraform.** Stay in the SES sandbox with verified demo recipients (OPS-008); production access is deferred. The job catalog is data, so a seed script loads it from a JSON file in the repo.
 
 **Setup.** To set up a new environment, run bootstrap, run `deploy.yml`, then run the seed script. After that, a teammate only needs to clone the repo and push to main.
 
 ## CI/CD
 
 `deploy.yml` runs on every push to main:
-- It builds the api, scraper, and worker images and pushes them to ECR, tagged with the commit SHA.
+- PRs and deploys run lint, unit tests, Terraform format/validate and a plan (OPS-005).
+- It builds one image per Lambda (API, parser, dispatcher, scraper, Matcher, Renderer, Notifier), using shared bases, and pushes commit-tagged images to seven ECR repositories with last-10 retention (OPS-004).
+- It builds web/ and publishes the dashboard assets after the dev Terraform deployment; production publication is manual (OPS-012).
 - It runs `terraform apply` for dev. Prod deploys only when we run it by hand.
 - It authenticates to AWS with GitHub's OIDC token, so no AWS keys are stored in GitHub.
 

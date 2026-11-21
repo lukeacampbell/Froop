@@ -14,7 +14,7 @@ The experience bank holds everything a student has done, in the student's own wo
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-19
+Last reviewed: 2026-11-21
 
 ## Files
 

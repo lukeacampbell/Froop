@@ -43,7 +43,7 @@ Status: Planned (the regeneration keys wait on DB-I04 amendment A)
 ### DB-T03: Test every access pattern
 Depends on: DB-T01, DB-T02
 Acceptance criteria:
-1. For each access pattern DB-AP01 to DB-AP20 (except DB-AP12, which is superseded), a test against DynamoDB Local writes sample items and answers the pattern with the stated key or index, using a query, not a scan.
+1. For each access pattern DB-AP01 to DB-AP20 (except DB-AP12, which is superseded), a test against `moto`'s fake DynamoDB (in the test process, with no Docker and no AWS account; changed from DynamoDB Local on 2026-11-23, accepted by Ryan Fusco and Graham Cohick, waiting for Luke Campbell) writes sample items and answers the pattern with the stated key or index, using a query, not a scan.
 2. The two scans that are allowed, DB-AP15 and DB-AP16, are paginated, and their tests resume from a saved position.
 3. Conditional writes block a second posting with the same key and a second match for the same student and posting.
 4. A query for one student never returns another student's items.

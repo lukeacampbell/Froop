@@ -176,6 +176,10 @@ Questions that span areas or affect the whole architecture. They use the `SYS-Q`
   - Owner: group
   - Blocks: WEB-012, and the Non-Goals section of the revised RFC
 
+- **SYS-Q06: May the TeX test run before Phase 2?** The riskiest part of Froop is whether `pdflatex` runs inside a Lambda container (DEL-T01 criterion 5). Phase 1 forbids writing code, so the test would otherwise wait until every area's plan is agreed. **Proposed answer (Ryan Fusco, 2026-11-24):** allow one exception: a throwaway test outside the repository (a Dockerfile and one EB-T08-style sample resume, compiled locally in the Lambda runtime). Nothing from it is committed as code; its results (image size, compile time, cold start, and any problem found) are written into `delivery/architecture.md`, and DEL-T01 is still built properly in Phase 2. **Graham Cohick agrees (2026-11-24).** Waiting for Luke Campbell.
+  - Owner: group
+  - Blocks: starting the TeX test before Phase 2
+
 ## Keeping Area Diagrams Current
 
 Each area's `architecture.drawio` and `architecture.png` show that area's design **as it stands now**, in more detail than the system diagram in `revised-rfc/`. They differ from the revised RFC in two ways:

@@ -3,11 +3,13 @@
 Owner: Graham Cohick.
 Date: 2026-11-18, revised 2026-11-23. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: decisions WEB-001 to WEB-013 (Accepted) and interfaces WEB-I01 (Accepted) and WEB-I02 (Proposed, waiting for Luke Campbell). No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: decisions WEB-001 to WEB-014 (Accepted) and interfaces WEB-I01 (Accepted) and WEB-I02 (Proposed, waiting for Luke Campbell). No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision, interface, or question still needs agreement before the task can be built. It doesn't mean the task was tried and failed.
 
 **Order.** The API's foundations (T01) → infrastructure (T02 to T04) → API endpoints (T05 to T10) → the dashboard (T11 to T16). The dashboard shell (T11) depends only on this area's own decisions, so it can start alongside T01.
+
+**Local development.** The dashboard runs locally (`localhost:5173`) against the dev API and dev Cognito, which allow that origin and callback (WEB-T02 criterion 4, WEB-T03 criterion 4). The API's unit tests run against a local DynamoDB stand-in, never against dev.
 
 **Tests.** Each task includes unit tests for its acceptance criteria in Phase 2. Tests that cross areas, such as an upload that ends in a parsed bank, belong to the Phase 3 test plans.
 
@@ -50,8 +52,8 @@ Depends on: WEB-T01, WEB-T02, WEB-005, WEB-010, WEB-011, WEB-013, OPS-004, OPS-0
 Acceptance criteria:
 1. The `app` module creates an HTTP API with a JWT authorizer that accepts only access tokens issued by the user pool for the dashboard's app client. A request with a missing, expired, or wrongly issued token gets 401 from API Gateway.
 2. `GET /health` is the only route without the authorizer.
-3. The API Lambda runs from the `api` image, has no function URL, and has a timeout below 30 seconds.
-4. CORS allows only the origins in a variable for each environment, and allows the `Idempotency-Key` header. A browser request from another origin is refused.
+3. The API Lambda runs from the `api` image, has no function URL, and has a timeout of 10 seconds and 512 MB of memory, both variables (WEB-011).
+4. CORS allows only the origins in a variable for each environment, and allows the `Idempotency-Key` header. A browser request from another origin is refused. In dev, the origins include the CloudFront domain and `http://localhost:5173`, so the dashboard can run locally against the dev API.
 5. The API Lambda's role grants only what this area's Requirements Intake row lists, on named resources.
 6. Alarms on API 5xx responses, API Lambda errors, and API latency send to the team's alarm topic (OPS-I04).
 Status: Planned (after WEB-T01 and WEB-T02)
@@ -104,12 +106,12 @@ Status: Planned (after DB-T02)
 Depends on: WEB-T01, WEB-T04, WEB-006, WEB-007, DB-I03, DB-I04, DEL-I01, DB-T01, DB-T02
 Acceptance criteria:
 1. `GET /matches` returns the caller's matches newest first, 25 to a page by default and at most 100. A `limit` outside 1 to 100 is rejected with 400.
-2. Following `nextCursor` from page to page returns every match exactly once. The last page has no `nextCursor`. A cursor that is malformed, or that was issued to another student, is rejected with 400.
+2. Following `nextCursor` from page to page returns every match exactly once. The last page has no `nextCursor`. A cursor that is malformed, or that was issued to another student, is rejected with 400. The cursor encodes the GSI3 position, and the API rejects it unless its `GSI3PK` equals the caller's own `USER#{sub}#MATCHES`; no signing secret is needed.
 3. `GET /matches/{postingKey}` returns the match's own copy of the posting, its delivery state, and `appliedAt`. For a match that doesn't exist or belongs to another student it returns 404.
 4. When `renderStatus` is `rendered`, the response has a signed link to the current resume that works and that expires 15 minutes after it was issued. For any other status, `resume` is null and `renderReason` is returned.
 5. `earlierResumes` lists every other PDF under `resume/{sub}/{postingKey}/`, each with its own signed link.
 6. Every signed path starts with `resume/{sub}/`, using the caller's `sub`. No request field can change the path that is signed.
-7. The signing key is read from Secrets Manager the first time a link is signed and kept for the life of the Lambda instance. If the key is missing, that request fails with an error and the next request tries again; a missing key is never cached (OPS-014).
+7. The signing key is read from Secrets Manager the first time a link is signed and kept for the life of the Lambda instance. If the key is missing, that request fails with an error and the next request tries again; a missing key is never cached (OPS-014). The link's `Key-Pair-Id` comes from `CLOUDFRONT_KEY_PAIR_ID`.
 8. `GET /matches/{postingKey}` returns `regenerating: true` while the match has an active regeneration request, and `false` otherwise (DB-I04 amendment A).
 Status: Planned (after DB-T02)
 
@@ -148,6 +150,8 @@ Acceptance criteria:
 5. The five screens in WEB-009 are reachable by hash-based routes, and reloading the page on any of them shows the same screen.
 6. Signing out clears the tokens and returns the student to the hosted UI.
 7. The API's address and the Cognito settings come from build settings. None is written in the source.
+8. The dashboard is built with Vite, React, and TypeScript, and signs in with `oidc-client-ts` (WEB-014). It has no router library and doesn't use Amplify.
+9. The types for every WEB-I01 request and response are generated with `openapi-typescript` from the API's OpenAPI schema, never written by hand (WEB-014 amendment).
 Status: Planned
 
 ### WEB-T12: Resume screen
@@ -202,4 +206,5 @@ Acceptance criteria:
 3. After a deploy, the dashboard served from CloudFront is the newly built version.
 4. Prod is published only when the deploy is started by hand.
 5. No AWS key is stored in GitHub. The workflow uses OIDC.
+6. A pull request that changes the API or the dashboard regenerates the TypeScript types from the API's OpenAPI schema and fails if they differ from the committed ones (WEB-014 amendment).
 Status: Planned (after WEB-T04 and OPS-T06)

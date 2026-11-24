@@ -5,7 +5,7 @@
 | Status | Revised. It reflects Accepted decisions only. |
 | Based on | `architecture/inputs/Froop_inital_architecture.pdf` (RFC 0001, last updated 2026-11-03) |
 | Repository | https://github.com/lukeacampbell/Froop |
-| Last updated | 2026-11-23 |
+| Last updated | 2026-11-24 |
 
 This is the current version of the Froop architecture proposal. It starts from the submitted RFC and applies every **Accepted** decision from `planning/architecture/<area>/architecture.md`. Text marked *(pending XX-Q00)* is still as originally submitted, because the open question that would change it isn't answered yet.
 
@@ -60,6 +60,11 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-23 | EB-020: no automatic retry of unclassified sections | Data Model |
 | 2026-11-23 | DEL-021: the Renderer invokes the Notifier for instant emails; DEL-022: no sweep for stuck instant emails | Architecture diagram, Security |
 | 2026-11-23 | WEB-012 and WEB-I01 accepted | Non-Goals, API (no text change) |
+| 2026-11-23 | EB-021: a stuck upload reports `failed`, the parser has a DLQ, and the later-issued upload wins; EB-022: students' own macros aren't expanded | Data Model |
+| 2026-11-23 | WEB-014: the dashboard uses Vite, React, TypeScript, and oidc-client-ts | AWS Services (no text change) |
+| 2026-11-24 | EB-023 (the `source`-to-`text` rules), EB-024 (the leftover-section Bedrock call), EB-025 (parser retries and limits); WEB-014 amended: generated API types | Data Model |
+| 2026-11-24 | EB-015 and EB-016 amended: `\resumeSubSubheading` and `\resumeSubItem`; DEL-023: the Renderer's allowed commands come from the experience-bank package | Security |
+| 2026-11-24 | EB-026: the parser ignores the preamble, and checks only the document body for dangerous commands | Security |
 
 ## Team
 
@@ -154,7 +159,7 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 - **Experience items:** each role, bullet, and skill stores both its exact LaTeX `source` and its plain `text`. Both come from the uploaded file without any rewording. Plain text is used for matching and the dashboard, and the source is used to build new resumes.
 - **Header block:** each upload also stores its header block (name and contact details) verbatim, and every generated resume starts with it.
 - **Matches:** matches never expire, so students can look back at them later. Postings still expire.
-- **Upload status:** an upload records its status: `awaiting_file` (link issued), `pending` (file arrived), `parsed`, `parsed_with_unclassified` (when the Bedrock cost cap was reached), or `failed`. A link that's never used reports `expired`, and a student who never uploaded reports `none` (EB-019). Sections left unclassified at the cost cap aren't retried automatically; uploading again tries again (EB-020).
+- **Upload status:** an upload records its status: `awaiting_file` (link issued), `pending` (file arrived), `parsed`, `parsed_with_unclassified` (when a leftover section couldn't be classified: the Bedrock cost cap was reached, the section was over the size limits, or the call failed, EB-024), or `failed`. An upload still `pending` after 10 minutes reports `failed` with reason `timeout`, and when two uploads finish out of order the one issued later becomes current (EB-021). A link that's never used reports `expired`, and a student who never uploaded reports `none` (EB-019). Unclassified sections aren't retried automatically; uploading again tries again (EB-020). Students' own `\newcommand` macros aren't expanded (EB-022).
 - **Replacing the bank:** a new upload's items are written under its own `docId` and become current in one pointer switch, so no reader ever sees a half-replaced bank (EB-008). Every section is labeled with a category, and skills keep their own categories (EB-016).
 - **postingKey (JDM-008):** `gh.{boardToken}.{jobPostId}`. The same Greenhouse post reached through catalog/private sources has one identity; distinct provider post IDs stay distinct. Conditional puts block duplicate postings and matches.
 - **Postings:** public provider records store title, company, location, description and apply link; source/subscription records hold membership separately. Postings expire 30 days after last seen; readers check expiry without waiting for TTL deletion (DB-I04).
@@ -245,7 +250,7 @@ Each module creates its own Lambdas, queues, roles, and alarms.
 - **Links:** upload links only allow one file in the user's own folder, and resume links expire. Links signed for the dashboard expire after 15 minutes, and only for resumes that have finished rendering.
 - **Cross-origin access:** the API accepts browser requests only from the dashboard's own address.
 - **Logs:** the API never logs tokens, email addresses, or resume text.
-- **Uploaded LaTeX is never run as code:** the parser only reads it as text and rejects dangerous commands (EB-009). The Renderer compiles only the macros its own template defines, with shell escape off (DEL-002).
+- **Uploaded LaTeX is never run as code:** the parser only reads it as text, ignores the preamble, and rejects dangerous commands in the document body (EB-009, EB-026). The Renderer compiles only the macros its own template defines plus the formatting commands the experience-bank package lists, with shell escape off (DEL-002, DEL-023).
 - **IAM:** each Lambda has its own role, with only the access it needs. The Renderer may invoke only the Notifier, to send instant emails (DEL-021).
 - **Secrets:** the only secret is the CloudFront signing key. It's kept in Secrets Manager, and only the api and notifier can read it. Job boards need no keys, and CI uses OIDC instead of AWS keys.
 

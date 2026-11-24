@@ -430,6 +430,26 @@ Consequences:
 - "No account deletion" is added to the RFC's Non-Goals once the group agrees.
 - The manual steps should be written down before real students use Froop.
 
+### WEB-014: The dashboard's stack: Vite, React, TypeScript, and oidc-client-ts
+Status: Accepted (Graham Cohick, 2026-11-23)
+Date: 2026-11-23
+Context: React is fixed by the RFC (p.3) and WEB-009, but nothing chose the build tool, the language, or how sign-in with PKCE (WEB-002) is done. The whole build has 2 to 3 weeks.
+Decision:
+- **Vite** builds the dashboard. It's one command to create the project and needs no configuration.
+- **TypeScript,** so the request and response shapes of WEB-I01 are checked when the dashboard is built.
+- **`oidc-client-ts`** does the Cognito sign-in: the authorization code flow with PKCE, the code exchange, and token storage. No Amplify.
+- **Hash routes** for the five screens (WEB-009, WEB-T11 criterion 5), switched on `window.location.hash`, with no router library.
+- **Plain CSS.**
+Alternatives:
+- Amplify. Rejected: heavy, and much more configuration for one sign-in flow.
+- Sign-in written by hand. Rejected: easy to get wrong.
+- Plain JavaScript. Rejected: TypeScript catches mismatches with WEB-I01 for little cost.
+- A router library. Rejected: five screens don't need one.
+Consequences:
+- WEB-T11 gains a criterion. The dashboard has two dependencies beyond React.
+
+**Amended 2026-11-24 (Graham Cohick):** the dashboard's TypeScript types for WEB-I01 aren't written by hand. They're generated with `openapi-typescript` from the OpenAPI schema the FastAPI app produces, and CI fails if the committed types differ from freshly generated ones. A change to the API that the dashboard doesn't handle then fails the build. This adds one development dependency.
+
 ## Interfaces
 
 ### Provides

@@ -462,6 +462,19 @@ Alternatives:
 Consequences:
 - The dashboard may show `notifyStatus: sending` on such a match. That's accepted for v1.
 
+### DEL-023: The Renderer's allowed commands come from the experience-bank package
+Status: Accepted (Ryan Fusco, 2026-11-24). Replaces DEL-002's "short safe list"; the rest of DEL-002 stands.
+Date: 2026-11-24
+Context: DEL-002's safe list named only `\textbf`, `\textit`, `\emph`, `\href`, `\&`, and `\%`. Jake's header also uses `\underline`, `\Huge`, `\scshape`, `\small`, `\vspace`, and `$|$`, which are standard LaTeX rather than template macros, so the Renderer would have stripped them and the header would lose its formatting.
+Decision:
+- The Renderer allows the macros the Froop template defines (`supported_templates()`) plus exactly the commands in `allowed_commands()` from the experience-bank package (EB-I03): EB-023's formatting and layout commands, escapes, and math symbols.
+- Any other command is still reduced to its text arguments (DEL-002).
+- None of the allowed commands reads or writes files or runs anything.
+Alternatives:
+- A separate list in the Renderer. Rejected: it would drift from the parser's (the reason for EB-015's single list).
+Consequences:
+- DEL-T02 criterion 1 changes. EB-I03 gains `allowed_commands()`.
+
 ## Interfaces
 
 ### Provides
@@ -478,7 +491,7 @@ Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Ryan Fusco (
 
 ### Consumes
 - **The SQS render message:** JDM-I03 from `job-discovery-and-matching`. Ryan Fusco accepted it on 2026-11-18 as the consumer. It covers DEL-010 and DEL-017.
-- **The header block, ranked items (`source` and `text`), and the supported-template list:** EB-I03, the experience bank package (EB-010, EB-014, EB-015). This area doesn't read experience items from the table directly.
+- **The header block, ranked items (`source` and `text`), the supported-template list, and the allowed commands (`allowed_commands()`, DEL-023):** EB-I03, the experience bank package (EB-010, EB-014, EB-015). This area doesn't read experience items from the table directly.
 - **Match delivery state:** DB-I03 in `database`. Delivery writes it.
 - **Posting details kept on the match** (title, company, location, apply link), used in emails: DB-Q05.
 - **User settings** (delivery mode, email address): item types in `database`, not defined yet (DB-Q01).

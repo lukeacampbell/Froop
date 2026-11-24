@@ -3,16 +3,16 @@
 Owner: Ryan Fusco.
 Date: 2026-11-19, revised 2026-11-23. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: decisions DEL-001 to DEL-022 (Accepted, except DEL-012, which is superseded) and interface DEL-I01 (Accepted). It consumes JDM-I03 (the render message) and EB-I03 (the bank package). No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: decisions DEL-001 to DEL-023 (Accepted, except DEL-012, which is superseded) and interface DEL-I01 (Accepted). It consumes JDM-I03 (the render message) and EB-I03 (the bank package). No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision or interface still needs agreement before the task can be built. It doesn't mean the task was tried and failed.
 
 **Order.**
-1. The template, safe compile, and page fitting (T01 to T03) are pure logic, so they can start first.
+1. **Prove the TeX image first** (DEL-T01 criterion 5), before anything else in this area. It's the riskiest part of the project: if `pdflatex` can't run in a Lambda container, no resume is ever made. Then the template, safe compile, and page fitting (T01 to T03), which are pure logic.
 2. The Renderer (T04) and the Notifier (T05, T06) follow once the shared database contracts are agreed.
 3. The infrastructure (T07) comes last.
 
-**Tests.** Each task includes unit tests for its acceptance criteria in Phase 2. Sample banks from `experience-bank` and sample render messages are shared by T01 to T04. Tests that cross areas, such as a match that ends in an email, belong to the Phase 3 test plans.
+**Tests.** Each task includes unit tests for its acceptance criteria in Phase 2. The synthetic sample resumes from EB-T08, the banks parsed from them, and sample render messages are shared by T01 to T04. Tests that cross areas, such as a match that ends in an email, belong to the Phase 3 test plans.
 
 | Waiting on | Tasks it blocks |
 |---|---|
@@ -27,14 +27,15 @@ Depends on: DEL-001, DEL-006, EB-015
 Acceptance criteria:
 1. One template defines the layout and every macro in `supported_templates()`, which currently means Jake's Resume. A test fails if any listed macro is undefined.
 2. The header block comes first, then sections in this order: Education, Experience, Projects, Technical Skills, then Awards, Certifications, and Publications.
-3. The template uses only packages included in the Renderer image (T07).
+3. The template uses only packages included in the Renderer image (T07). Jake's Resume needs `latexsym`, `fullpage`, `titlesec`, `marvosym`, `color`, `verbatim`, `enumitem`, `hyperref`, `fancyhdr`, `babel` (English), `tabularx`, and `glyphtounicode.tex`.
 4. A sample bank renders to a PDF with no LaTeX errors.
+5. **Done first:** the Renderer's container image (TeX with only the packages the template needs) compiles the clean EB-T08 sample inside the Lambda runtime, with only `/tmp` writable (`TEXMFVAR`, `TEXMFCACHE`, and the output directory under `/tmp`). The image size, the compile time, and the cold-start time are written in `architecture.md`. If any of them is a problem, a `Proposed` decision is recorded before more delivery work is built. If the group accepts SYS-Q06, a throwaway version of this test runs before Phase 2 and its results are recorded early.
 Status: Planned
 
 ### DEL-T02: Sanitize source and compile safely
-Depends on: DEL-002, EB-009, EB-012
+Depends on: DEL-002, DEL-023, EB-009, EB-012, EB-023, EB-T01
 Acceptance criteria:
-1. Every item's `source` is checked against the macros the template defines, plus a short safe list (`\textbf`, `\textit`, `\emph`, `\href`, `\&`, `\%`, and the like). Any other macro is reduced to its text arguments. A test checks that the words stay the same.
+1. Every item's `source` is checked against the macros the template defines plus the commands `allowed_commands()` returns (DEL-023). Any other macro is reduced to its text arguments. A test checks that the words stay the same, and that the EB-T08 header keeps `\underline`, `\Huge`, `\scshape`, and its links.
 2. Compilation runs `pdflatex` with `-no-shell-escape`, `openin_any` and `openout_any` set to paranoid, inside a temporary directory, under a time limit (default: 20 seconds).
 3. A test file that tries `\write18`, `\input`, or reading `/etc/passwd` produces no side effect, and the render fails cleanly.
 4. The page count is read from the PDF that was produced.
@@ -62,14 +63,15 @@ Acceptance criteria:
 3. If `docId` isn't the current upload, or `get_items` reports missing IDs, it sets `renderStatus=skipped` with reason `bank_replaced`, sends no email, and doesn't retry.
 4. The PDF is written to `resume/{sub}/{postingKey}/g{generation}.pdf` and never overwrites another file.
 5. It updates `renderStatus`, `pdfKey`, and `requestId` with writes conditional on `generation`. It never changes `generation`; whoever admits the render request sets it (DB-I04 amendment A).
-6. For an instant-mode `new_match`, after the delivery state is written, it invokes the Notifier asynchronously with `{schemaVersion: 1, mode: "instant", sub, postingKey, generation}` (DEL-021). A failed invoke is logged and doesn't fail the render. A `regenerate` request never invokes the Notifier.
+6. Instant or digest is decided by the match's own `deliveryMode` (DB-I04, DB-I05), never the student's current settings. For an instant-mode `new_match`, after the delivery state is written, it invokes the Notifier asynchronously with `{schemaVersion: 1, mode: "instant", sub, postingKey, generation}` (DEL-021). A failed invoke is logged and doesn't fail the render. A `regenerate` request never invokes the Notifier.
 7. Logs carry `sub`, `postingKey`, and `generation`, and never contain resume text.
 Status: Planned (after DEL-T03 and EB-T01)
 
 ### DEL-T05: Instant emails, sent at most once
 Depends on: DEL-T04, DEL-004, DEL-018, DEL-021, DEL-022, DB-I03, DB-I05, OPS-008
 Acceptance criteria:
-1. One email per instant match, with the PDF attached (raw MIME) and the posting details in the body. The address comes from the Profile item (DB-I05).
+1. One email per instant match, with the PDF attached (raw MIME) and the posting details in the body. The address comes from the Profile item (DB-I05). The sender is the single verified address in the `SES_SENDER_ADDRESS` setting.
+6. The email has a plain-text part and a minimal HTML part with the same content: the posting's title, company, and location, its apply link, and a note that the tailored resume is attached. Nothing else from the bank or the posting description is included.
 2. `notifyStatus` moves `pending` → `sending` with a conditional write before sending. If that write fails, nothing is sent.
 3. After SES accepts the message, `notifyStatus` moves to `sent`. An instant match left in `sending` by a crash stays there and is never resent (DEL-022).
 4. A recipient that isn't verified in the SES sandbox ends as `failed`, with the SES reason recorded.
@@ -81,7 +83,7 @@ Depends on: DEL-T05, DEL-011, DEL-019, DEL-020, DB-I01, DB-I03
 Acceptance criteria:
 1. Two EventBridge schedules trigger the Notifier: hourly at minute 0 (UTC), and daily at 13:00 UTC.
 2. Each run reads the GSI2 bucket for this send, `DIGEST#hourly#{UTC-hour}` or `DIGEST#daily#{UTC-date}`, plus the earlier buckets it may have missed (the last 24 hourly or the last 7 daily).
-3. **Rendered matches** go into one email per student, with CloudFront signed links (7-day expiry). Each one is moved through `sending` → `sent`, as in T05, and its GSI2 fields are removed.
+3. **Rendered matches** go into one email per student, from the `SES_SENDER_ADDRESS` sender, with a plain-text part and a minimal HTML part listing each match's title, company, location, apply link, and a CloudFront signed link to its resume (7-day expiry). Each one is moved through `sending` → `sent`, as in T05, and its GSI2 fields are removed.
 4. **Pending matches** are moved to the next send's bucket.
 5. **Skipped and failed matches** lose the mark, and no email is sent.
 6. A run repeated for the same send sends nothing twice.

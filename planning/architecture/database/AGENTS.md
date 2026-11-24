@@ -26,6 +26,7 @@ Last reviewed: 2026-11-23
 | `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. DB-001 and DB-I01 to DB-I05 (DB-I04 base) are Accepted. DB-I04 amendment A (regeneration) is Proposed, waiting for Luke Campbell. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-23. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. DB-T01 to DB-T03. All Planned. The regeneration parts of DB-T02 and DB-T03 wait on DB-I04 amendment A. Every owner must agree to changes. |
+| Code (Phase 2) | The table definition in `infra/modules/data/` (DB-T01), the key-builder package in `libs/` (DB-T02), and the access-pattern tests (DB-T03). These folders are created by OPS-T01. | Not yet created |
 
 Where to look:
 
@@ -55,6 +56,27 @@ Where to look:
 - Proposing anything that adds cost, or a second data store.
 - Moving any item to `Accepted`. That needs every owner (see "Shared Ownership").
 - Moving the area to `In Review` (the coordinator) or `Approved` (every owner).
+
+**In Phase 2 (implementation)**, these replace the planning-only items above. The repository's `AGENTS.md` lists the rules for all code, and the Code Map of which folder belongs to which area.
+
+*Agents may, without asking:*
+- Implement a task whose status is `Planned`, exactly as its acceptance criteria say, once the group has confirmed Phase 2.
+- Write unit tests for each acceptance criterion, in the code folder's own tests.
+- Set the task's status to `In Progress` and `Done` in `implementation-plan.md`.
+- Record a `Proposed` decision or an Open Question in `architecture.md` when the code shows that a plan is wrong or incomplete.
+
+*Check with the owners (Ryan Fusco, Graham Cohick, Luke Campbell) first before:*
+- Changing an acceptance criterion, or building something no task covers. Propose the change in `implementation-plan.md` first.
+- Changing the shape of anything listed under Interfaces → Provides. This also needs every consumer's owner.
+- Adding a third-party dependency, an AWS service, or anything that costs money.
+- Editing a folder that belongs to another area (see the Code Map in the repository's `AGENTS.md`).
+
+*Rules for this area's code:*
+- **Every key is built by the key builders** (DB-T02). No other code formats `PK`, `SK`, or index keys itself.
+- **A new item type needs a row in Item Types first,** and a test in DB-T03 before any code relies on its access pattern.
+- **Queries only,** except the two paginated scans DB-AP15 and DB-AP16.
+- **Duplicates are blocked with conditional writes,** never by checking first.
+- **Every write checks item size** against the 300 KiB ceiling (DB-T02 criterion 4).
 
 **Ground rules.** Every proposal in this area must uphold these:
 - **Access patterns come first.** Nothing is added to the design unless an access pattern listed in `architecture.md` needs it.

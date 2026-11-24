@@ -14,7 +14,7 @@ Build and Operation makes sure every part of Froop can be built, deployed, watch
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-23
+Last reviewed: 2026-11-24
 
 ## Files
 
@@ -24,6 +24,7 @@ Last reviewed: 2026-11-23
 | `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Requirements Intake, Open Questions | Draft. OPS-001 to OPS-012 and OPS-I01 to OPS-I05 are Accepted. OPS-013 (dev only) is Proposed. |
 | `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-23. Update it with every change to the design. |
 | `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. OPS-T01 to OPS-T10, all Planned. Every owner must agree to changes. |
+| Code (Phase 2) | `infra/bootstrap/`, `infra/modules/data/` and `infra/modules/ops/`, `infra/envs/`, `.github/workflows/`, the shared base image, and the logging helper in `libs/`. These folders are created by OPS-T01. | Not yet created |
 
 Where to look:
 
@@ -51,6 +52,28 @@ Where to look:
 - Proposing anything that loosens access or permissions.
 - Moving any item to `Accepted`. That needs every owner (see "Shared Ownership").
 - Moving the area to `In Review` (the coordinator) or `Approved` (every owner).
+
+**In Phase 2 (implementation)**, these replace the planning-only items above. The repository's `AGENTS.md` lists the rules for all code, and the Code Map of which folder belongs to which area.
+
+*Agents may, without asking:*
+- Implement a task whose status is `Planned`, exactly as its acceptance criteria say, once the group has confirmed Phase 2.
+- Write unit tests for each acceptance criterion, in the code folder's own tests.
+- Set the task's status to `In Progress` and `Done` in `implementation-plan.md`.
+- Record a `Proposed` decision or an Open Question in `architecture.md` when the code shows that a plan is wrong or incomplete.
+
+*Check with the owners (Ryan Fusco, Graham Cohick, Luke Campbell) first before:*
+- Changing an acceptance criterion, or building something no task covers. Propose the change in `implementation-plan.md` first.
+- Changing the shape of anything listed under Interfaces → Provides. This also needs every consumer's owner.
+- Adding a third-party dependency, an AWS service, or anything that costs money.
+- Editing a folder that belongs to another area (see the Code Map in the repository's `AGENTS.md`).
+
+*Rules for this area's code:*
+- **Every setting is a variable** in the environment's `tfvars` (OPS-T03): cost caps, budget, models, sign-up switch, CORS origins.
+- **No secret in the repository, in CI settings, or in Terraform state or outputs** (OPS-T07, OPS-014).
+- **No IAM statement uses `"Resource": "*"` for data access** (OPS-T07).
+- **Each area's Lambdas, queues, and roles go in that area's module** (OPS-011, SYS-Q03). This area provides the modules' shared conventions, not their contents.
+- **Changes to CI, the shared base image, or a shared module affect every area.** Tell the other owners in the PR description.
+- **Terraform is applied by `deploy.yml`,** except the one-time bootstrap (OPS-T02).
 
 **Ground rules.** Every proposal in this area must uphold these:
 - **Everything can be rebuilt from the repository.** Anything that has to be done by hand is listed as an exception, with its reason.

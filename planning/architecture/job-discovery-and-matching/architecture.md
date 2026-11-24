@@ -282,4 +282,6 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| _None awaiting Luke's answer._ | | Remaining cross-owner follow-ups are recorded at their sources. |
+| EB-Q14 | `experience-bank/architecture.md` | Luke Campbell: say where Bedrock model prices live; the proposal is a price table per model in the reservation package (JDM-T05) (2026-11-24). |
+| SYS-Q06 | `planning/architecture/AGENTS.md` | Luke Campbell: agree or disagree that the TeX test may run before Phase 2, outside the repository (Ryan Fusco and Graham Cohick agree, 2026-11-24). |
+| Repository `AGENTS.md` | `AGENTS.md` at the repository root | Luke Campbell: check the Code Map rows for this area's folders, and add a Phase 2 block to this area's `AGENTS.md` like the ones in the other areas (added 2026-11-23). |

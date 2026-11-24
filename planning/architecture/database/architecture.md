@@ -296,4 +296,5 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| DB-T03 criterion 1 | `implementation-plan.md` | Luke Campbell: accept testing access patterns with `moto` instead of DynamoDB Local (2026-11-23). |
 | DB-I04 amendment A | this file | Luke Campbell: review and accept the regeneration amendment (Ryan Fusco and Graham Cohick have accepted). |

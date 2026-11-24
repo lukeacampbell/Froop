@@ -260,16 +260,34 @@ Status: Proposed. Accepted by: Ryan Fusco (2026-11-23), Graham Cohick (2026-11-2
 Date: 2026-11-23
 Context: Resume links are CloudFront signed URLs (WEB-007, DEL-004), and the private key lives in Secrets Manager (OPS-I03). Nothing in the plans created the key pair. Generating it in Terraform (`tls_private_key`) would store the private key in the Terraform state file.
 Decision:
-- **Create it by hand,** once per environment: generate an RSA 2048 key pair locally (`openssl`), put the private key in Secrets Manager with the AWS CLI, then delete the local copy. This is a step in the OPS-T10 runbook.
+- **Create it by hand,** once per environment, in two steps of the OPS-T10 runbook. Before the first deploy: generate an RSA 2048 key pair locally (`openssl`) and commit the public half. After the first deploy has created the empty secret: put the private key in it with the AWS CLI, then delete the local copy.
 - **Terraform holds only the public half:** a CloudFront public key and key group, built from a `.pem` public key file committed to `infra/`. The secret itself is created by Terraform with no value; only its value is set by hand.
-- **Order:** Terraform creates the secret empty on the first deploy, so the hand step comes **after** the first deploy.
+- **Order:** Terraform needs the public key file on the first deploy and creates the secret empty, so the private key is stored **after** the first deploy.
 - **Read only when signing:** the API and the Notifier read the key when they sign a link, not at start-up. A missing key fails only that request, visibly: an error on the dashboard's resume link, or `notifyStatus: failed` on a digest match. OPS-T05's start-up check covers the secret's ARN, not its value.
+- **Key pair ID:** a signed link carries the `Key-Pair-Id` of the CloudFront public key, which isn't secret. Terraform outputs it and passes it to the API and the Notifier as `CLOUDFRONT_KEY_PAIR_ID`, next to the secret's ARN.
 - **Rotation:** none in v1. To rotate, repeat the step and update the public key file.
 Alternatives:
 - `tls_private_key` in Terraform. Rejected: the private key would sit in the state file, against OPS-T07 criterion 4.
 Consequences:
-- OPS-T10's runbook gains this step, right after the first deploy.
+- OPS-T10's runbook gains these two steps: making the key pair before the first deploy, and storing the private key right after it.
 - WEB-T04 registers the committed public key with the distribution.
+
+### OPS-015: Low-cost platform defaults
+Status: Proposed. Accepted by: Ryan Fusco (2026-11-23), Graham Cohick (2026-11-23). Waiting for: Luke Campbell.
+Date: 2026-11-23
+Context: A review of the implementation plans found settings no decision had fixed. Each one either costs money if left at AWS's default or protects the only environment (OPS-013).
+Decision (every value is a variable in `tfvars`):
+- **Log retention:** every CloudWatch log group keeps logs for 14 days (`log_retention_days`). AWS's default keeps them forever, and they're billed by size.
+- **ECR retention:** the `renderer` repository keeps its last 3 images, because TeX images are large; every other repository keeps 10, as in OPS-004.
+- **Table protection:** the DynamoDB table has deletion protection on. Removing it is a deliberate, separate change.
+- **API Gateway throttling:** 10 requests per second steady, bursts of 20, for the whole API (`api_throttle_rate`, `api_throttle_burst`). Phase 5 may change them.
+- **SES sender:** one verified sender address (`ses_sender_address`), passed to the Notifier as `SES_SENDER_ADDRESS` (OPS-008).
+- **No VPC:** every Lambda runs outside a VPC, AWS's default. They reach DynamoDB, S3, SQS, Bedrock, SES, Secrets Manager, and Greenhouse over HTTPS, authorized by IAM. Froop has no private resources (no database server or cache) that would need one. A Lambda inside a VPC would need a NAT gateway (about $32 a month plus data) or interface endpoints (about $7 a month each) to reach those services.
+Alternatives:
+- AWS defaults. Rejected: logs never expire, and the table could be deleted by one bad apply.
+- Lambdas in a VPC. Rejected: a monthly cost for no security gain, because no private resource exists.
+Consequences:
+- OPS-T03, OPS-T04, and OPS-T10 change; OPS-004's retention is amended for `renderer` only.
 
 ## Interfaces
 
@@ -350,7 +368,7 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 | Area | Need | Source | Status |
 |---|---|---|---|
 | web-app-and-api | **Sign-in:** Cognito user pool, hosted UI, and a public app client using the code flow with PKCE (WEB-002); the self sign-up switch and callback URLs as variables for each environment (WEB-004). **API:** API Gateway HTTP API with a JWT authorizer, CORS origins as a variable for each environment (WEB-010), and throttling values; the `api` image with no function URL (WEB-005) and a timeout under 30 seconds (WEB-011). **Table:** read and write on Profile, Settings, Subscription, and private Source items, `appliedAt` on matches, and queries on GSI1 and GSI3 (DB-I05, DB-I04). **Buckets:** write to `uploads/` for upload links, with the uploads bucket allowing a browser POST from the dashboard's origin (EB-018), delete through the bank package (EB-I03), and list `resume/` (WEB-007). **Queues:** send a refresh request (JDM-I01), and send regeneration work to the match queue after writing its Work record (JDM-I05, WEB-013). **CloudFront:** the static site, and `resume/` behind signed URLs, with read access to the signing key. **Alarms:** API Lambda errors and latency, with the API 5xx alarm. **CI:** the dashboard build and publish step (OPS-012). | RFC p.3–4, 7; WEB-001 to WEB-011; `web-app-and-api` review item 17 | Proposed (revised 2026-11-18; confirmed by Graham Cohick, OPS-Q07) |
-| experience-bank | Uploads bucket that accepts only `.tex` through a presigned POST (EB-018: content type, 1 byte to 1 MB, 15-minute expiry; POST allowed from the dashboard's origin), with event notifications to the Bank parser; parser Lambda (small: a Python LaTeX parser, with no OCR and no TeX install, EB-001, EB-009); Bedrock invoke permission; budget reservations through the shared package (JDM-I04, EB-017); table access for experience items | RFC p.3, 5; EB-I01; EB-017; EB-018 | Proposed |
+| experience-bank | Uploads bucket that accepts only `.tex` through a presigned POST (EB-018: content type, 1 byte to 1 MB, 15-minute expiry; POST allowed from the dashboard's origin), with event notifications to the Bank parser; an SQS dead-letter queue as the parser's asynchronous on-failure destination (EB-021); parser Lambda with 1 asynchronous retry, a 120-second timeout, and 512 MB (EB-025; small: a Python LaTeX parser, with no OCR and no TeX install, EB-001, EB-009); Bedrock invoke permission; budget reservations through the shared package (JDM-I04, EB-017); table access for experience items | RFC p.3, 5; EB-I01; EB-017; EB-018 | Proposed |
 | job-discovery-and-matching | One dispatcher tick; HTTP-only Greenhouse scraper; Matcher; scrape/match/render queues and DLQs; durable recovery and cost reservations; seed catalog. Digest schedules stay with delivery. See OPS-I05 for permissions/configuration. | JDM-001 to JDM-007, OPS-011 | Proposed amendment; replaces RFC-derived JDM intake |
 | delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES at most once, DEL-004, DEL-018; invoked asynchronously by the Renderer for instant matches, so the Renderer role needs `lambda:InvokeFunction` on the Notifier only, DEL-021; the Notifier role reads the Profile item for the address, DB-I05, and reads `resume/` to attach the PDF to instant emails, DEL-004 — added 2026-11-23, accepted by Ryan Fusco and Graham Cohick (2026-11-23), waiting for Luke Campbell); hourly and daily digest schedules that trigger the Notifier (DEL-019); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |
 | database | One table with the keys, GSI1, GSI2, GSI3 (no LSI), and TTL from DB-I01 and DB-I04 | RFC p.5; DB-I01; DB-I04 | Proposed |
@@ -389,4 +407,6 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
+| OPS-T01 criterion 4; Phase 2 working agreement | `implementation-plan.md`; `AGENTS.md` in this area and in `database` | Luke Campbell: review the per-folder `AGENTS.md` requirement and the Phase 2 rules added on 2026-11-23. |
+| OPS-015, OPS-T11, OPS-T12 | this file; `implementation-plan.md` | Luke Campbell: review the low-cost defaults (now including "no VPC"), the account setup and teardown tasks, the `CLOUDFRONT_KEY_PAIR_ID` setting in OPS-014, and OPS-T06 criterion 5 (`moto`, no Docker) (2026-11-23). |
 | OPS-013, OPS-014, delivery intake row | this file | Luke Campbell: accept or reject deploying dev only (OPS-013), making the signing key pair by hand (OPS-014), and the Notifier's added read access in the delivery row of the Requirements Intake. |

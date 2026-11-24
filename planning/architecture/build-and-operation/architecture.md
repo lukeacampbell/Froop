@@ -240,12 +240,43 @@ Consequences:
 - The deploy role needs permission to write to the static-site bucket and to create CloudFront invalidations.
 - The dashboard's build settings come from Terraform outputs, so nothing is hard-coded in the repository.
 
+### OPS-013: Deploy only a dev environment for this version
+Status: Proposed. Accepted by: Ryan Fusco (2026-11-23), Graham Cohick (2026-11-23). Waiting for: Luke Campbell.
+Date: 2026-11-23
+Context: The project is due in mid-December 2026 and runs on free-tier budgets (OPS-009). The RFC (p.6–7) and OPS-001, OPS-005, and OPS-012 assume two environments, `envs/dev` and `envs/prod`. A second environment doubles the bootstrap, the deploy paths, the manual steps (SES recipients, Bedrock model access, catalog seed), and the chance of an unexpected bill, and the demo doesn't need it.
+Decision:
+- **One environment:** only `envs/dev` is deployed. The demo runs from dev.
+- **No prod:** no `envs/prod` folder, prod state key, or manual prod deploy in this version. The modules stay environment-agnostic, so prod can be added later as a new decision.
+- **CI:** `deploy.yml` applies dev on every push to `main`. The manual prod workflow in OPS-005 and OPS-012 isn't built.
+Alternatives:
+- Dev and prod, as in the RFC. Rejected for now: twice the setup and cost for no demo benefit.
+Consequences:
+- OPS-T02, OPS-T03, and OPS-T06 drop their prod parts once this is Accepted.
+- Settings that were "per environment" (the sign-up switch WEB-004, CORS origins WEB-010, the caps OPS-002/OPS-010, the budget OPS-009) are set once, in dev's `tfvars`.
+- The revised RFC's "Environments and state" and CI/CD sections change once this is Accepted.
+
+### OPS-014: The CloudFront signing key pair is made by hand, never by Terraform
+Status: Proposed. Accepted by: Ryan Fusco (2026-11-23), Graham Cohick (2026-11-23). Waiting for: Luke Campbell.
+Date: 2026-11-23
+Context: Resume links are CloudFront signed URLs (WEB-007, DEL-004), and the private key lives in Secrets Manager (OPS-I03). Nothing in the plans created the key pair. Generating it in Terraform (`tls_private_key`) would store the private key in the Terraform state file.
+Decision:
+- **Create it by hand,** once per environment: generate an RSA 2048 key pair locally (`openssl`), put the private key in Secrets Manager with the AWS CLI, then delete the local copy. This is a step in the OPS-T10 runbook.
+- **Terraform holds only the public half:** a CloudFront public key and key group, built from a `.pem` public key file committed to `infra/`. The secret itself is created by Terraform with no value; only its value is set by hand.
+- **Order:** Terraform creates the secret empty on the first deploy, so the hand step comes **after** the first deploy.
+- **Read only when signing:** the API and the Notifier read the key when they sign a link, not at start-up. A missing key fails only that request, visibly: an error on the dashboard's resume link, or `notifyStatus: failed` on a digest match. OPS-T05's start-up check covers the secret's ARN, not its value.
+- **Rotation:** none in v1. To rotate, repeat the step and update the public key file.
+Alternatives:
+- `tls_private_key` in Terraform. Rejected: the private key would sit in the state file, against OPS-T07 criterion 4.
+Consequences:
+- OPS-T10's runbook gains this step, right after the first deploy.
+- WEB-T04 registers the committed public key with the distribution.
+
 ## Interfaces
 
 ### Provides
 
 #### OPS-I01: Deployment contract
-Status: Proposed
+Status: Accepted (2026-11-23)
 Consumers: web-app-and-api, job-discovery-and-matching, experience-bank, delivery
 Contract:
 - **Images:** every Lambda is a container image in ECR, one image per function, built from a shared base (OPS-003, OPS-004).
@@ -253,10 +284,10 @@ Contract:
 - **Config:** comes from environment variables that Terraform sets: table name, bucket names, queue URLs, and the secret ARN.
 - **Environments:** pushes to `main` deploy to dev automatically. Prod deploys only when started by hand.
 - **Area resources:** each area's Lambdas, queues, roles, and alarms live in that area's Terraform module (SYS-Q03).
-Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
+Accepted by: Graham Cohick (2026-11-19), Luke Campbell (2026-11-21), Ryan Fusco (2026-11-23).
 
 #### OPS-I02: Storage resources
-Status: Proposed
+Status: Accepted (2026-11-23)
 Consumers: all areas, database
 Contract:
 - **Table:** one DynamoDB table per environment, provisioned from DB-I01. Its name is passed to services as config (OPS-I01).
@@ -266,16 +297,16 @@ Contract:
   - static site: served through CloudFront
 
   Each area owns the key layout of its own prefix (EB-I01, DEL-I01).
-Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
+Accepted by: Graham Cohick (2026-11-19), Luke Campbell (2026-11-21), Ryan Fusco (2026-11-23).
 
 #### OPS-I03: IAM and secrets
-Status: Proposed
+Status: Accepted (2026-11-23)
 Consumers: all areas
 Contract: Each Lambda has its own role, granted only the permissions its area lists in the Requirements Intake. The only secret is the CloudFront signing key, stored in Secrets Manager and readable only by `api` and `notifier`. Job boards need no keys, and nothing is stored in git or in GitHub secrets.
-Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
+Accepted by: Graham Cohick (2026-11-19), Luke Campbell (2026-11-21), Ryan Fusco (2026-11-23).
 
 #### OPS-I04: Observability conventions
-Status: Proposed
+Status: Accepted (2026-11-23)
 Consumers: all areas
 Contract:
 - **Logs:** every Lambda writes JSON logs to CloudWatch, including `sourceId` and `postingKey` (and `sub`/`docId` where relevant), so one posting can be traced from scrape to email.
@@ -294,7 +325,7 @@ Contract:
   - SES bounces
 
   All alarms go to SNS, which emails the team.
-Accepted by: Graham Cohick (2026-11-19). Luke Campbell (2026-11-21). Waiting for: Ryan Fusco.
+Accepted by: Graham Cohick (2026-11-19), Luke Campbell (2026-11-21), Ryan Fusco (2026-11-23).
 
 #### OPS-I05: Amended JDM Requirements Intake
 Status: Accepted
@@ -321,7 +352,7 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 | web-app-and-api | **Sign-in:** Cognito user pool, hosted UI, and a public app client using the code flow with PKCE (WEB-002); the self sign-up switch and callback URLs as variables for each environment (WEB-004). **API:** API Gateway HTTP API with a JWT authorizer, CORS origins as a variable for each environment (WEB-010), and throttling values; the `api` image with no function URL (WEB-005) and a timeout under 30 seconds (WEB-011). **Table:** read and write on Profile, Settings, Subscription, and private Source items, `appliedAt` on matches, and queries on GSI1 and GSI3 (DB-I05, DB-I04). **Buckets:** write to `uploads/` for upload links, with the uploads bucket allowing a browser POST from the dashboard's origin (EB-018), delete through the bank package (EB-I03), and list `resume/` (WEB-007). **Queues:** send a refresh request (JDM-I01), and send regeneration work to the match queue after writing its Work record (JDM-I05, WEB-013). **CloudFront:** the static site, and `resume/` behind signed URLs, with read access to the signing key. **Alarms:** API Lambda errors and latency, with the API 5xx alarm. **CI:** the dashboard build and publish step (OPS-012). | RFC p.3–4, 7; WEB-001 to WEB-011; `web-app-and-api` review item 17 | Proposed (revised 2026-11-18; confirmed by Graham Cohick, OPS-Q07) |
 | experience-bank | Uploads bucket that accepts only `.tex` through a presigned POST (EB-018: content type, 1 byte to 1 MB, 15-minute expiry; POST allowed from the dashboard's origin), with event notifications to the Bank parser; parser Lambda (small: a Python LaTeX parser, with no OCR and no TeX install, EB-001, EB-009); Bedrock invoke permission; budget reservations through the shared package (JDM-I04, EB-017); table access for experience items | RFC p.3, 5; EB-I01; EB-017; EB-018 | Proposed |
 | job-discovery-and-matching | One dispatcher tick; HTTP-only Greenhouse scraper; Matcher; scrape/match/render queues and DLQs; durable recovery and cost reservations; seed catalog. Digest schedules stay with delivery. See OPS-I05 for permissions/configuration. | JDM-001 to JDM-007, OPS-011 | Proposed amendment; replaces RFC-derived JDM intake |
-| delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES at most once, DEL-004, DEL-018); hourly and daily digest schedules that trigger the Notifier (DEL-019); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |
+| delivery | Renderer Lambda (`renderer` image, OPS-003, with a minimal TeX distribution holding only the template's packages, compiled with shell escape off and file access restricted, DEL-002); Notifier Lambda (sends raw MIME email with attachments through SES at most once, DEL-004, DEL-018; invoked asynchronously by the Renderer for instant matches, so the Renderer role needs `lambda:InvokeFunction` on the Notifier only, DEL-021; the Notifier role reads the Profile item for the address, DB-I05, and reads `resume/` to attach the PDF to instant emails, DEL-004 — added 2026-11-23, accepted by Ryan Fusco and Graham Cohick (2026-11-23), waiting for Luke Campbell); hourly and daily digest schedules that trigger the Notifier (DEL-019); resumes bucket with no expiry (DEL-007); SES identity, in the sandbox with verified recipients (OPS-008); read access to the signing key; digest schedule target | RFC p.3–5; DEL-I01 | Proposed |
 | database | One table with the keys, GSI1, GSI2, GSI3 (no LSI), and TTL from DB-I01 and DB-I04 | RFC p.5; DB-I01; DB-I04 | Proposed |
 | experience-bank | The experience bank package (EB-I03) built into the `api` image and every image that runs the parser, Matcher, or Renderer | EB-010 | Proposed |
 | all | Spend limits and alarms that email the team | RFC p.8 | Proposed |
@@ -332,7 +363,7 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 - OPS-001/004/005/007/012: accept native state locking, one image per function, shared bases, CI checks, the monorepo and web/ publication. They keep deployment reproducible and changes independently deployable; prod remains manual.
 - OPS-003: accept renderer isolation as amended by OPS-011. Greenhouse discovery has no Chromium/Playwright dependency.
 - OPS-002/006/008/009/010: accept configured hourly/daily caps, the cheapest model passing agreed samples in us-east-1, verified sandbox demo recipients and the monthly budget alert. No exact model is selected without evaluation. The $50 alert is not a hard AWS cap; the daily Bedrock cap leaves limited room for other AWS charges.
-- OPS-I01 to I04: Luke accepts deployment/storage contracts, least-privilege permissions and observability because every area needs a consistent operational boundary. Ryan's provider acceptance is still required.
+- OPS-I01 to I04: Luke accepts deployment/storage contracts, least-privilege permissions and observability because every area needs a consistent operational boundary. *Ryan Fusco accepted them on 2026-11-23, so all four are Accepted.*
 - OPS-Q07 and OPS-I05: confirm the amended JDM row: HTTP Greenhouse scraper, dispatcher/Matcher in ingestion, persisted recovery and delivery-owned digest schedules. Graham and Ryan have already accepted OPS-I05. The DB regeneration amendment remains separate.
 
 
@@ -340,6 +371,10 @@ One row per need, citing where it came from. Rows taken from the RFC are `Propos
 
 Answered: OPS-Q11 (OPS-012), OPS-Q01 (OPS-001), OPS-Q02 (OPS-002), OPS-Q03 (OPS-003, OPS-004), OPS-Q04 (OPS-005), OPS-Q05 (OPS-008), OPS-Q06 (OPS-006), OPS-Q08 (OPS-007), OPS-Q09 (OPS-009), OPS-Q10 (OPS-010). Each answer is Proposed until every owner accepts it.
 
+- **OPS-Q12: Which AWS account hosts Froop, and how do teammates get access?** OPS-013 deploys one environment, and OPS-T02 bootstraps it, but no account was named.
+  - *Ryan Fusco's answer (2026-11-23): Froop runs in Ryan Fusco's AWS account. How Graham Cohick and Luke Campbell get access (IAM users, roles, or SSO) will be worked out later. The instructor meeting (MQ-2026-11-19-01, on credits) may still change this.*
+  - Owner: Ryan Fusco (account); group (teammate access)
+  - Blocks: OPS-T02 (bootstrap needs the account), and teammates running deploys or the runbook
 - **OPS-Q07: Are the RFC-derived Requirements Intake rows right?** Luke Campbell and Graham Cohick need to confirm the rows for their areas.
   - *Graham Cohick confirms the `web-app-and-api` row (2026-11-18), as revised from WEB-001 to WEB-011. Its regeneration queue is pending WEB-Q03. Luke confirms his amended row in OPS-I05 (2026-11-21).*
   - Owner: Luke Campbell, Graham Cohick
@@ -354,4 +389,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| JDM-Q03, OPS-I05 | `job-discovery-and-matching/architecture.md`; this file | Agree amended HTTP-only intake, dispatcher/recovery configuration and ingestion module placement. |
+| OPS-013, OPS-014, delivery intake row | this file | Luke Campbell: accept or reject deploying dev only (OPS-013), making the signing key pair by hand (OPS-014), and the Notifier's added read access in the delivery row of the Requirements Intake. |

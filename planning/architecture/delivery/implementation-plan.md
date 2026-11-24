@@ -1,9 +1,9 @@
 # Delivery Implementation Plan
 
 Owner: Ryan Fusco.
-Date: 2026-11-19. Phase: Architecture Planning. State: Draft.
+Date: 2026-11-19, revised 2026-11-23. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: decisions DEL-001 to DEL-020 (Accepted, except DEL-012, which is superseded) and interface DEL-I01 (Accepted). It consumes JDM-I03 (the render message) and EB-I03 (the bank package). No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: decisions DEL-001 to DEL-022 (Accepted, except DEL-012, which is superseded) and interface DEL-I01 (Accepted). It consumes JDM-I03 (the render message) and EB-I03 (the bank package). No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision or interface still needs agreement before the task can be built. It doesn't mean the task was tried and failed.
 
@@ -16,14 +16,12 @@ This plan builds the design in `architecture.md`: decisions DEL-001 to DEL-020 (
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| EB-T01 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
-| EB-T01 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
-| EB-T01 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
 | `experience-bank` building its package (EB-T01) | T04 (T01 to T03 use fixtures until then) |
 
 ## Building the resume
 
-**Dependency update (2026-11-21):** Luke answered the shared approvals. DB-I01/I03/I04 base, DB-001, OPS decisions and OPS-I05 are Accepted. DB-I02 awaits DB-Q10; OPS-I01 to I04 await Ryan. Existing task sequence/criteria are unchanged; the owner should finalize readiness against these blockers.
+**Dependency update (2026-11-23):** DB-I01, DB-I03, DB-I05, every OPS decision, and OPS-I01 to I05 are Accepted. DB-I02 is Accepted too (2026-11-23), so nothing in this area waits on an agreement.
+
 ### DEL-T01: The Froop resume template
 Depends on: DEL-001, DEL-006, EB-015
 Acceptance criteria:
@@ -57,25 +55,26 @@ Status: Planned
 ## Renderer and Notifier
 
 ### DEL-T04: The Renderer Lambda
-Depends on: DEL-T03, DEL-003, DEL-009, DEL-010, DEL-017, DEL-I01, JDM-I03, EB-I03, EB-T01, DB-I03
+Depends on: DEL-T03, DEL-003, DEL-009, DEL-010, DEL-017, DEL-021, DEL-I01, JDM-I03, EB-I03, EB-T01, DB-I03
 Acceptance criteria:
 1. It accepts JDM-I03 messages with `schemaVersion` 1. An unknown version fails visibly and goes to the DLQ.
 2. A repeated `(sub, postingKey, docId, requestId)` is acknowledged and dropped. A `generation` lower than the match's current one is dropped.
 3. If `docId` isn't the current upload, or `get_items` reports missing IDs, it sets `renderStatus=skipped` with reason `bank_replaced`, sends no email, and doesn't retry.
 4. The PDF is written to `resume/{sub}/{postingKey}/g{generation}.pdf` and never overwrites another file.
-5. It updates `renderStatus`, `pdfKey`, `generation`, and `requestId` with writes conditional on `generation`.
-6. For an instant-mode `new_match`, it hands off to the Notifier. A `regenerate` request never triggers an email.
+5. It updates `renderStatus`, `pdfKey`, and `requestId` with writes conditional on `generation`. It never changes `generation`; whoever admits the render request sets it (DB-I04 amendment A).
+6. For an instant-mode `new_match`, after the delivery state is written, it invokes the Notifier asynchronously with `{schemaVersion: 1, mode: "instant", sub, postingKey, generation}` (DEL-021). A failed invoke is logged and doesn't fail the render. A `regenerate` request never invokes the Notifier.
 7. Logs carry `sub`, `postingKey`, and `generation`, and never contain resume text.
-Status: Blocked (DB-I03 Accepted (2026-11-21); EB-T01)
+Status: Planned (after DEL-T03 and EB-T01)
 
 ### DEL-T05: Instant emails, sent at most once
-Depends on: DEL-T04, DEL-004, DEL-018, DB-I03, DB-I05, OPS-008
+Depends on: DEL-T04, DEL-004, DEL-018, DEL-021, DEL-022, DB-I03, DB-I05, OPS-008
 Acceptance criteria:
 1. One email per instant match, with the PDF attached (raw MIME) and the posting details in the body. The address comes from the Profile item (DB-I05).
 2. `notifyStatus` moves `pending` → `sending` with a conditional write before sending. If that write fails, nothing is sent.
-3. After SES accepts the message, `notifyStatus` moves to `sent`. A match stuck in `sending` for more than 15 minutes is marked `failed` and never resent.
+3. After SES accepts the message, `notifyStatus` moves to `sent`. An instant match left in `sending` by a crash stays there and is never resent (DEL-022).
 4. A recipient that isn't verified in the SES sandbox ends as `failed`, with the SES reason recorded.
-Status: Planned (DB-I03, OPS-008 and DB-I05 Accepted; execution still waits for Phase 2 and predecessor tasks)
+5. The Notifier sends only when the match is `rendered`, its `generation` equals the invoke's, and `notifyStatus` is `pending`. A repeated invoke sends nothing (DEL-021).
+Status: Planned (after DEL-T04)
 
 ### DEL-T06: Digest schedules and digest emails
 Depends on: DEL-T05, DEL-011, DEL-019, DEL-020, DB-I01, DB-I03
@@ -86,7 +85,8 @@ Acceptance criteria:
 4. **Pending matches** are moved to the next send's bucket.
 5. **Skipped and failed matches** lose the mark, and no email is sent.
 6. A run repeated for the same send sends nothing twice.
-Status: Planned (DB-I01/I03 Accepted; execution still waits for Phase 2 and predecessor tasks)
+7. A marked match found in `sending` for more than 15 minutes is marked `failed`, loses its mark, and isn't sent (DEL-018, DEL-022).
+Status: Planned (after DEL-T05)
 
 ## Infrastructure
 
@@ -95,7 +95,7 @@ Depends on: DEL-T04, DEL-T06, OPS-004, OPS-I01, OPS-I03, OPS-I04, OPS-T04, OPS-T
 Acceptance criteria:
 1. The `renderer` image holds a minimal TeX distribution with only the packages the template uses (DEL-T01). The Notifier has its own small image.
 2. Both functions, the render queue's consumer settings, and the two schedules are in the `resumes` Terraform module (SYS-Q03).
-3. **Renderer role:** read the bank through the package, write `resume/`, and update match delivery fields.
-4. **Notifier role:** query GSI2, update delivery fields, read the signing key, and send through SES.
+3. **Renderer role:** read the bank through the package, write `resume/`, update match delivery fields, and invoke the Notifier (DEL-021).
+4. **Notifier role:** query GSI2, read the Profile item (the email address, DB-I05), read `resume/` objects (to attach the PDF to instant emails, DEL-004), update delivery fields, read the signing key, and send through SES.
 5. Alarms cover render-queue DLQ depth, Renderer errors, and SES bounces.
-Status: Blocked (OPS-I01 to I04 still await Ryan; Luke has accepted)
+Status: Planned (after DEL-T04 and DEL-T06)

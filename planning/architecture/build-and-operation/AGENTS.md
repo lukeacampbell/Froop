@@ -1,6 +1,6 @@
 # Build and Operation AGENTS.md
 
-Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This area is shared (see "Shared Ownership" in `planning/architecture/AGENTS.md`; pending confirmation in SYS-Q01).
+Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This area is shared (see "Shared Ownership" in `planning/architecture/AGENTS.md`; confirmed in SYS-Q01).
 Contributors: —
 
 This file is the working agreement for agents in the build-and-operation area. It explains how to find your way around the area and what you may do here. It has no design or implementation content. That lives in `architecture.md` and `implementation-plan.md`.
@@ -14,16 +14,16 @@ Build and Operation makes sure every part of Froop can be built, deployed, watch
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-23
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Requirements Intake, Open Questions | Draft. OPS-001 to OPS-011 and OPS-I05 contain shared proposals; Greenhouse-only intake updated. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-18. Update it with every change to the design. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. OPS-T01 to OPS-T10. Blocked mainly on Luke Campbell's acceptance of OPS-001 to OPS-010 and OPS-012. Every owner must agree to changes. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Requirements Intake, Open Questions | Draft. OPS-001 to OPS-012 and OPS-I01 to OPS-I05 are Accepted. OPS-013 (dev only) is Proposed. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-23. Update it with every change to the design. |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. OPS-T01 to OPS-T10, all Planned. Every owner must agree to changes. |
 
 Where to look:
 

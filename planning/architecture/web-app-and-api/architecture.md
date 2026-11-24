@@ -4,7 +4,7 @@ Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`). See "Whe
 
 ## Scope
 
-Confirmed by Graham Cohick (2026-11-18). It follows the Areas list in `planning/AGENTS.md` and the "Does not own" lists of the other five areas. The split with `build-and-operation` assumes SYS-Q01 (Graham Cohick and Ryan Fusco agree; waiting for Luke Campbell).
+Confirmed by Graham Cohick (2026-11-18). It follows the Areas list in `planning/AGENTS.md` and the "Does not own" lists of the other five areas. The split with `build-and-operation` assumes SYS-Q01, which all three owners have confirmed.
 
 **Owns:**
 - **Sign-in.** The Cognito user pool, its app client, and the hosted UI: who can sign up, how a student signs in, and which token the dashboard sends to the API. Every other area identifies a student by the Cognito `sub` this area issues.
@@ -420,7 +420,7 @@ Consequences:
 
 ### WEB-012: Account deletion is a non-goal for this version
 **Luke's acceptance (2026-11-21):** Agree SYS-Q05: no self-service account deletion in this demo; handle data-deletion requests manually. This limits UI/API scope while retaining a way to delete data. All three owners now agree; Graham can finalize his decision status.
-Status: Proposed. Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19). Luke Campbell agrees (2026-11-21, SYS-Q05); Graham to finalize the area decision status.
+Status: Accepted (2026-11-23). Accepted by: Graham Cohick (2026-11-18), Ryan Fusco (2026-11-19), Luke Campbell (2026-11-21, SYS-Q05).
 Date: 2026-11-18
 Context: Review item 16. Answers WEB-Q05. A student can delete their bank but not their account, matches, or resume PDFs.
 Decision: This version has no account deletion. On request, the team deletes a student's data by hand: the Cognito user, the items under `USER#{sub}`, their private sources, and their objects under `uploads/` and `resume/`.
@@ -435,7 +435,7 @@ Consequences:
 ### Provides
 
 #### WEB-I01: Public REST API
-Status: Proposed
+Status: Accepted (2026-11-23)
 Consumers: the dashboard (this area). Other areas don't call it, but each relies on the endpoints that carry its feature: experience-bank (`/uploads`, `/experience`), job-discovery-and-matching (`/sources`, `/subscriptions`, the settings in `/me`), and delivery (`/matches`).
 Contract: the endpoints in WEB-001, with these shapes. Parts marked *(pending)* wait on the named question.
 - **Common rules:**
@@ -460,41 +460,43 @@ Contract: the endpoints in WEB-001, with these shapes. Parts marked *(pending)* 
 - **`GET /matches/{postingKey}`** → `{postingKey, posting: {title, company, location, applyUrl, description}, createdAt, appliedAt, renderStatus, renderReason, notifyStatus, resume, earlierResumes}`.
   - `posting` is the match's own copy of the posting (DB-Q05).
   - `resume` is `{generation, url, expiresAt}` when `renderStatus` is `rendered`, and null otherwise. `earlierResumes` is a list of the same shape (WEB-007, DEL-I01, DB-I03).
+  - `regenerating` is true while the match has an active regeneration request (`activeRegenerationRequestId`, DB-I04 amendment A), and false otherwise. `resume` keeps pointing at the current resume until the new one is rendered. *(Added 2026-11-23, Graham Cohick.)*
 - **`PUT /matches/{postingKey}/applied`** → `{appliedAt}`. Repeating it keeps the first time. **`DELETE`** → 204 (DB-Q06).
-- **`POST /matches/{postingKey}/regenerate`** needs an `Idempotency-Key` header holding a UUID, and returns 202 with `{requestId}`. Missing or invalid key: 400. The same key again for the same match: the same 202 and `requestId`. A different key while one is running, or a key already used for another match: 409 (JDM-I05, WEB-013).
+- **`POST /matches/{postingKey}/regenerate`** needs an `Idempotency-Key` header holding a UUID, and returns 202 with `{requestId}`. Missing or invalid key: 400. The same key again for the same match: the same 202 and `requestId`. A different key while one is running: 409 with code `regeneration_in_progress`. A key already used for another match: 409 (JDM-I05, WEB-013). The match's resume still rendering: 409 with code `render_in_progress` (DB-I04 amendment A; added 2026-11-23, Graham Cohick).
 
 In paths, `sourceId` is `gh.{boardToken}` or `private.{ownerKey}.gh.{boardToken}`, and `postingKey` is `gh.{boardToken}.{jobPostId}` (JDM-008, JDM-009). The dashboard still treats both as opaque.
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-23, provider; the dashboard, its consumer, is in this area).
 
 #### WEB-I02: Student identity
-Status: Proposed
+Status: Proposed (waiting for Luke Campbell)
 Consumers: experience-bank, job-discovery-and-matching, delivery, database
 Contract:
 - A student is identified everywhere by the `sub` claim of their Cognito access token: a fixed string that never changes for that account and is never given to another.
 - Only the API turns a token into a `sub`. Other areas receive it already checked, in an S3 key the API issued (EB-I01), an item the API wrote, or a message that came from one.
 - The email address is not part of the identity. It is in the Profile item (DB-I05).
 - Deleting a Cognito user doesn't delete that student's data (WEB-012).
-Accepted by: —
+Accepted by: Graham Cohick (2026-11-23, provider), Ryan Fusco (2026-11-23, consumer: experience-bank, delivery). Waiting for: Luke Campbell (consumer: job-discovery-and-matching; co-owner of database).
 
 ### Consumes
 
 Graham Cohick has accepted every contract this area uses. "Agreed" below means the other owners have too.
 - **The upload object contract:** EB-I01 from `experience-bank`, a presigned POST (EB-018). Accepted 2026-11-19. Agreed.
-- **The experience bank package:** EB-I03 from `experience-bank`. The API lists the bank, reads upload status, creates uploads, and deletes the bank only through it. Base contract accepted 2026-11-18 and agreed. The EB-019 extension (`create_upload`, the status list) accepted 2026-11-19; waiting for Luke Campbell.
+- **The experience bank package:** EB-I03 from `experience-bank`. The API lists the bank, reads upload status, creates uploads, and deletes the bank only through it. Base contract accepted 2026-11-18 and agreed. The EB-019 extension (`create_upload`, the status list) accepted 2026-11-19. Agreed (2026-11-23).
 - **Greenhouse sources, subscriptions, and refresh:** JDM-I01 from `job-discovery-and-matching`, with the JDM-009 ID formats and filter matching. Accepted 2026-11-19. Agreed.
-- **Regeneration command intake:** JDM-I05 from `job-discovery-and-matching`. The API writes the work records and sends them on (WEB-013). Accepted 2026-11-19. Agreed, with one point to confirm (WEB-Q08).
+- **Regeneration command intake:** JDM-I05 from `job-discovery-and-matching`. The API writes the work records and sends them on (WEB-013). Accepted 2026-11-19. Agreed, including the WEB-Q08 clarification (JDM-011, 2026-11-23).
 - **Resume PDF objects:** DEL-I01 from `delivery`. Accepted 2026-11-18. Agreed.
-- **Table conventions and items:** DB-I01, DB-I02, DB-I03, and DB-I04 in `database`, accepted as a co-owner (DB-I03 on 2026-11-18, the rest on 2026-11-19); each waits for Luke Campbell. DB-I05 (Profile and Settings), which this area proposed and writes, is Accepted by all three owners.
-- **Deployment, storage, IAM and secrets, observability, and the job-discovery resources:** OPS-I01 to OPS-I05 from `build-and-operation`, accepted as a co-owner on 2026-11-19. OPS-I01 to OPS-I04 wait for Ryan Fusco and Luke Campbell.
+- **Table conventions and items:** DB-I01, DB-I02, DB-I03, and DB-I04 in `database`, accepted as a co-owner (DB-I03 on 2026-11-18, the rest on 2026-11-19). DB-I01, DB-I03, and DB-I04 (base) are Agreed (2026-11-21), and DB-I02 (2026-11-23). DB-I04 amendment A (regeneration) has this area's acceptance and waits for Luke Campbell. DB-I05 (Profile and Settings), which this area proposed and writes, is Accepted by all three owners.
+- **Deployment, storage, IAM and secrets, observability, and the job-discovery resources:** OPS-I01 to OPS-I05 from `build-and-operation`, accepted as a co-owner on 2026-11-19. All Agreed (OPS-I01 to OPS-I04 on 2026-11-23).
 
 ## Open Questions
 
-Answered: WEB-Q01 (EB-018; EB-I01 accepted), WEB-Q02 (EB-019; the EB-I03 extension accepted), WEB-Q03 (JDM-010 and JDM-I05 accepted; the API's side is WEB-013; WEB-Q08 follows from it), WEB-Q04 and WEB-Q06 (JDM-009; JDM-I01 accepted), WEB-Q07 (the task IDs are now in `implementation-plan.md`). Graham Cohick accepted each answer on 2026-11-19. The entries stay below as the record.
+Answered: WEB-Q08 (JDM-011 and the EB-019 amendment, 2026-11-23), WEB-Q01 (EB-018; EB-I01 accepted), WEB-Q02 (EB-019; the EB-I03 extension accepted), WEB-Q03 (JDM-010 and JDM-I05 accepted; the API's side is WEB-013; WEB-Q08 follows from it), WEB-Q04 and WEB-Q06 (JDM-009; JDM-I01 accepted), WEB-Q07 (the task IDs are now in `implementation-plan.md`). Graham Cohick accepted each answer on 2026-11-19. The entries stay below as the record.
 
 - **WEB-Q08: Which record triggers upload regeneration?** The student's "regenerate?" choice is now stored twice. `create_upload(sub, regenerate)` puts it on the upload record (EB-019), and the API writes a `regen-upload:{docId}` work record when it is true (JDM-I05). EB-019 says the dispatcher reads the choice through `upload_status`, "one record, not two". JDM-I05 says the dispatcher works from the work record, which is the only one its recovery scan can find. The two writes aren't atomic, so they can disagree. Proposed (WEB-013): the work record is the trigger, and the value on the upload record is for display only. If that's right, EB-019's wording should say so. If the upload record is meant to be the trigger, JDM-I05 needs a way for the dispatcher to find it.
   - **Luke's answer (2026-11-21):** Agree WEB-013: the work record alone triggers regeneration; upload.regenerate is display only. Persist work before returning upload credentials; on persistence failure return a retryable error without the form, and resolve uncertain writes with the same docId/workId. JDM-011 records the reasoning and proposed expired-status alignment. Ryan must confirm EB-019 wording; the DB amendment remains pending.
+  - **Ryan Fusco agrees (2026-11-23):** the work record is the only trigger, and the upload record's `regenerate` value is for display. EB-019 is amended to say so, and an `expired` or `failed` upload ends the command (JDM-011, Accepted). Resolved.
   - Owner: Luke Campbell, Ryan Fusco
-  - Blocks: WEB-T10, and the regeneration amendment to DB-I04
+  - Blocks: nothing. WEB-T10 still waits on the DB-I04 regeneration amendment.
 
 - **WEB-Q01: Can the upload be a presigned POST instead of a presigned PUT?** EB-I01 says "one object per presigned PUT" with a maximum size, but S3 enforces a size range only on a presigned POST (review item 4). Proposed: change EB-I01 to a presigned POST whose policy fixes the key, the content type, and the size range.
   - *Answered by Ryan Fusco (2026-11-19): yes, a presigned POST (EB-018). The policy fixes the key, `application/x-tex`, 1 byte to 1 MB, and a 15-minute expiry. EB-I01 is revised and accepted on the provider side.*
@@ -537,4 +539,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| JDM-011 / DB-Q10 | job-discovery-and-matching/architecture.md; database/architecture.md | Review trigger/expiry clarification and DB regeneration amendment; keep WEB-T10 and diagram aligned after agreement. |
+| _None yet._ | | |

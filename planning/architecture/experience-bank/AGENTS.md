@@ -14,16 +14,16 @@ The experience bank holds everything a student has done, in the student's own wo
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-23
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-003, EB-005, EB-006, EB-008 to EB-010, and EB-012 to EB-019 are Accepted. EB-004 and EB-011 are superseded, and EB-007 is deferred. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-17. Update it with every change to the design. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. EB-T01 to EB-T07. The parsing core (EB-T03, EB-T04) is Planned. The rest is Blocked on the shared database and build-and-operation contracts. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions | Draft. All sections are drafted. EB-001 to EB-003, EB-005, EB-006, EB-008 to EB-010, and EB-012 to EB-020 are Accepted. EB-004 and EB-011 are superseded, and EB-007 is deferred. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-23. Update it with every change to the design. |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. EB-T01 to EB-T07. All Planned. |
 
 Where to look:
 

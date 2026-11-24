@@ -107,7 +107,7 @@ Alternatives: DynamoDB Streams/outbox infrastructure is deferred; silent best-ef
 Consequences: Renderer must deduplicate by `(sub, postingKey, docId, requestId)` and reject stale generations (JDM-I03). Only one render-changing operation per match is active at a time; regeneration waits until the prior delivery operation is terminal, preventing old workers replacing new PDFs. New-match conditional creation preserves one match per user/posting. Recheck subscription before starting a new match; regeneration authorizes the owned match instead. DLQ messages remain recoverable by operator redrive; exhausted attempts are `failed`, not automatically requeued forever. Delivery uses Ryan’s at-most-once email policy (DEL-018): an uncertain send is not retried automatically and may result in no email; the dashboard retains the result.
 
 ### JDM-005: Filter deterministically, then rank existing bank IDs in one call
-Status: Proposed
+Status: Proposed. Ryan Fusco endorses it (2026-11-23, contributor for the Matcher and bullet selection), including scores comparable across roles and projects, which DEL-013 relies on. Waiting for: Luke Campbell (owner).
 Date: 2026-11-18
 Context: Discovery and resume tailoring have different responsibilities.
 Decision: All subscribed postings passing configured filters become candidates. Empty filters mean no restriction. Within title or location include lists use OR; across dimensions use AND; exclusions win. Match case-insensitive normalized plain text; do not infer remote eligibility from missing location. API settings schema must agree (JDM-Q01). Read the bank only through EB-I03; EB-I02 is deferred in v1 (JDM-008). Missing bank leaves work `waiting_bank`; exclude unclassified sections. One Bedrock call ranks role/project/bullet/skill IDs using the job description and bank, with no generated resume text or separate requirement-extraction call.
@@ -166,12 +166,12 @@ Alternatives: API fire-and-forget queue messages lose intent on failures; parser
 Consequences: Graham must agree API writes/idempotency semantics; Ryan must agree per-upload status lookup through EB-I03. DB-I04 and OPS-I05 must include these work fields/API permissions before implementation. Their base-intake acceptances are recorded in JDM-I05; the clarification in JDM-011 remains pending.
 
 ### JDM-011: Clarify the upload regeneration trigger
-Status: Proposed cross-area clarification; Luke Campbell agrees (2026-11-21); Graham proposed this in WEB-013; Ryan confirmation pending WEB-Q08.
+Status: Accepted (2026-11-23). Proposed by Graham Cohick in WEB-013; Luke Campbell agrees (2026-11-21); Ryan Fusco agrees (2026-11-23), including the expiry alignment, and amends EB-019 to match.
 Date: 2026-11-21
 Context: EB-019 describes one record, which conflicts with durable command recovery in JDM-I05.
 Decision: The WORK record is the only regeneration trigger. The upload record's regenerate flag records the student's choice for display. The API calls create_upload, then conditionally persists regen-upload:{docId} before returning the POST form when opted in. If persistence fails, return a retryable error without the upload form; an unused upload can expire safely. Resolve uncertain writes using the same docId/workId before acknowledging success. No work record means no regeneration; the parser never dispatches it.
 Reasoning: Recovery already scans durable work. This avoids a second scan of bank records and makes a failed queue send recoverable without requiring a transaction across package boundaries.
-Consequences: Continue waiting for that exact docId to parse successfully and become current. Proposed alignment with EB-019: a reported expired/failed upload terminates the command without fanout; retain the existing 24-hour timeout only as a fallback for a nonterminal upload. Superseded uploads also do not regenerate. Ryan must confirm EB-019 wording and the expiry alignment; the DB-I04 regeneration amendment still needs group approval.
+Consequences: Continue waiting for that exact docId to parse successfully and become current. Proposed alignment with EB-019: a reported expired/failed upload terminates the command without fanout; retain the existing 24-hour timeout only as a fallback for a nonterminal upload. Superseded uploads also do not regenerate. Ryan confirmed EB-019 wording and the expiry alignment (2026-11-23, EB-019 amendment); the DB-I04 regeneration amendment still needs group approval.
 
 ### JDM-012: Keep the safety mechanisms; review complexity at November end
 Status: Accepted (Luke Campbell, delegated answer, 2026-11-21)
@@ -210,7 +210,7 @@ Contract: `reserve(sub, attemptId, upperBoundMicroUsd, nowUtc)` returns `reserve
 Accepted by: Ryan Fusco (2026-11-18, consumer: experience-bank, recorded as EB-017). Accepted by: Luke Campbell (2026-11-18, provider). Shared database and build-and-operation parts follow DB-I04 and OPS-I05.
 
 #### JDM-I05: Regeneration command intake
-Status: Accepted (base intake; WEB-Q08 clarification awaits Ryan)
+Status: Accepted (base intake; WEB-Q08 clarification settled in JDM-011, 2026-11-23)
 Consumers: web-app-and-api (command producer), JDM dispatcher/Matcher; experience-bank (status provider), database
 Contract:
 - Reuse USER#{sub}/WORK#{workId}; workType distinguishes upload_regenerate, per_match_regenerate and existing new_match work. API gets sub from the authenticated token. Store requestId, requestedAt, reason=regenerate, state, and targetDocId or postingKey as applicable. JDM owns state transitions after creation.
@@ -218,7 +218,7 @@ Contract:
 - Fanout selects active/unexpired/unapplied matches under JDM-007. Child work IDs derive deterministically from parent requestId and postingKey; store a continuation cursor so retries cannot lose later pages. Recheck targetDocId before each child starts; if replaced again, skip that old command. Regeneration never creates a new digest mark or email.
 - Per-match requests require an Idempotency-Key (UUID), used as requestId under the authenticated sub and postingKey. Atomically create work and claim the match’s activeRegenerationRequestId. Repeating the same key for the same match returns the same 202/requestId; another key while active returns 409; a key reused with a different target returns 409. Missing/invalid key returns 400. Ownership failure returns 404. This HTTP addition needs Graham’s agreement.
 - After commit, best-effort enqueue JDM-I02 {sub,workId}; persisted pending work is the source of truth if enqueue fails. Generation is allocated atomically when the operation is admitted; retries reuse it. Clear an active request only with a conditional requestId/generation check on terminal completion/failure. Pending render handoff must not release it prematurely.
-Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, upload-status provider: `upload_status(sub, docId)` in EB-019). Graham Cohick (2026-11-19, command producer: web-app-and-api, including the `Idempotency-Key` header; his API's side is WEB-013). All parties accepted the base intake. WEB-Q08/JDM-011 clarification awaits Ryan; the DB regeneration amendment remains Proposed.
+Accepted by: Luke Campbell (2026-11-18, JDM side), Ryan Fusco (2026-11-19, upload-status provider: `upload_status(sub, docId)` in EB-019). Graham Cohick (2026-11-19, command producer: web-app-and-api, including the `Idempotency-Key` header; his API's side is WEB-013). All parties accepted the base intake and the WEB-Q08/JDM-011 clarification (Ryan Fusco, 2026-11-23). The DB regeneration amendment remains Proposed.
 
 ### Consumes
 

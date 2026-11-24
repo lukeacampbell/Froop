@@ -3,7 +3,7 @@
 Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This is a shared area, so every owner must agree to changes to this plan.
 Date: 2026-11-19. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: the table conventions (DB-I01), the item contracts (DB-I02 to DB-I05), and access patterns DB-AP01 to DB-AP20. DB-001 and DB-I01/I03/I04 base/I05 are Accepted as of 2026-11-21. DB-I02 awaits the expiry separation in DB-Q10; the DB-I04 regeneration amendment needs separate agreement. Each area writes its own items, so this plan covers only what every area shares: the table definition, one set of key builders, and a test that each access pattern works. No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: the table conventions (DB-I01), the item contracts (DB-I02 to DB-I05), and access patterns DB-AP01 to DB-AP20. DB-001 and DB-I01/I03/I04 base/I05 are Accepted as of 2026-11-21. DB-I02 is Accepted as of 2026-11-23 (DB-Q10). The DB-I04 regeneration amendment (amendment A) waits for Luke Campbell. Each area writes its own items, so this plan covers only what every area shares: the table definition, one set of key builders, and a test that each access pattern works. No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision or interface still needs agreement before the task can be built.
 
@@ -11,7 +11,7 @@ This plan builds the design in `architecture.md`: the table conventions (DB-I01)
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| DB-I02: agree the DB-Q10 upload-expiry separation | T02, T03 |
+| DB-I04 amendment A (regeneration): Luke Campbell | Only the regeneration keys in T02 (`REGENREQ#`, the regeneration work IDs) and the DB-AP21/AP22 tests in T03 |
 
 DB-I05 is Accepted.
 
@@ -38,7 +38,7 @@ Acceptance criteria:
 3. Every item carries `itemType`. A test fails if code writes an `itemType` that isn't in the Item Types table.
 4. A helper checks an item's serialized size against the 300 KiB ceiling before it's written.
 5. Every area's code imports these builders rather than formatting keys itself. Experience items are still written only through the experience-bank package (EB-010), which uses these builders internally.
-Status: Blocked (DB-I02 / DB-Q10; regeneration key additions also await the DB-I04 amendment)
+Status: Planned (the regeneration keys wait on DB-I04 amendment A)
 
 ### DB-T03: Test every access pattern
 Depends on: DB-T01, DB-T02
@@ -48,4 +48,4 @@ Acceptance criteria:
 3. Conditional writes block a second posting with the same key and a second match for the same student and posting.
 4. A query for one student never returns another student's items.
 5. When a new access pattern is added to `architecture.md`, it gets a test here before any code relies on it.
-Status: Blocked (DB-T02 / DB-I02 / DB-Q10)
+Status: Planned (after DB-T02; the DB-AP21/AP22 tests wait on DB-I04 amendment A)

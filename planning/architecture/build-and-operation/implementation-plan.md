@@ -1,9 +1,9 @@
 # Build and Operation Implementation Plan
 
 Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This is a shared area, so every owner must agree to changes to this plan.
-Date: 2026-11-19. Phase: Architecture Planning. State: Draft.
+Date: 2026-11-19, revised 2026-11-23. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: decisions OPS-001 to OPS-012 and interfaces OPS-I01 to OPS-I05. OPS-001 to OPS-012 and OPS-I05 are Accepted as of 2026-11-21. Luke has accepted OPS-I01 to I04; those still await Ryan. No infrastructure exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: decisions OPS-001 to OPS-012 and interfaces OPS-I01 to OPS-I05. OPS-001 to OPS-012 and OPS-I05 are Accepted as of 2026-11-21, and OPS-I01 to I04 as of 2026-11-23. OPS-013 (dev only) is Proposed. No infrastructure exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision or interface still needs agreement before the task can be built. It doesn't mean the task was tried and failed.
 
@@ -17,7 +17,8 @@ This plan builds the design in `architecture.md`: decisions OPS-001 to OPS-012 a
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| Ryan Fusco accepting OPS-I01 to I04 | T04 to T08 |
+| Luke Campbell accepting OPS-013 (dev only) | Only the prod parts of T02, T03, and T06. Each would be dropped. |
+| Luke Campbell accepting OPS-014 (signing key made by hand) | The signing-key step in T10 |
 
 ## Foundations
 
@@ -65,7 +66,7 @@ Acceptance criteria:
 3. **Resumes bucket:** private, with no expiry rule. An optional move to Standard-IA after 30 days is allowed. Served only through CloudFront OAC.
 4. **Static-site bucket:** private, served only through CloudFront.
 5. Public access is blocked on all three buckets.
-Status: Blocked (OPS-I02 awaits Ryan)
+Status: Planned
 
 ### OPS-T05: Images and the deployment contract
 Depends on: OPS-T01, OPS-T02, OPS-003, OPS-004, OPS-011, OPS-I01
@@ -74,7 +75,7 @@ Acceptance criteria:
 2. The `scraper` image has no browser. The `renderer` image is the only one with TeX.
 3. Each image declares its handler entry point and reads all configuration from environment variables. A missing variable makes the function fail at start-up with a clear message.
 4. Images are tagged with the commit SHA.
-Status: Blocked (OPS-I01 awaits Ryan)
+Status: Planned
 
 ### OPS-T06: CI and deployment workflows
 Depends on: OPS-T01, OPS-T02, OPS-T05, OPS-005, OPS-012
@@ -89,7 +90,7 @@ Acceptance criteria:
    Prod runs the same steps only when started by hand.
 3. Both workflows authenticate through OIDC only. No AWS keys are stored in GitHub.
 4. Pull requests to `main` require `ci.yml` to pass.
-Status: Blocked (OPS-T05 depends on OPS-I01 acceptance)
+Status: Planned
 
 ## Security, observability, and cost
 
@@ -100,7 +101,7 @@ Acceptance criteria:
 2. The CloudFront signing key is stored in Secrets Manager. Only the `api` and `notifier` roles can read it.
 3. A check in CI fails if any role uses `"Resource": "*"` for data access.
 4. No secret appears in the repository, in CI settings, or in Terraform output.
-Status: Blocked (OPS-I03 awaits Ryan)
+Status: Planned
 
 ### OPS-T08: Logging, metrics, dashboard, and alarms
 Depends on: OPS-T03, OPS-I04
@@ -114,7 +115,7 @@ Acceptance criteria:
    - API 5xx
    - SES bounces
    - 80% of the hourly and daily Bedrock caps
-Status: Blocked (OPS-I04 awaits Ryan)
+Status: Planned
 
 ### OPS-T09: The monthly budget alert
 Depends on: OPS-T03, OPS-009
@@ -132,7 +133,8 @@ Acceptance criteria:
    - enable Bedrock model access in `us-east-1`
    - verify the team's and the demo's email addresses in the SES sandbox
    - run the catalog seed script
+   - after the first deploy: create the CloudFront signing key pair and store the private half in the secret Terraform created (OPS-014, once Accepted)
    - redrive a DLQ
 2. A teammate following the runbook from a fresh clone gets a working dev environment.
-3. The runbook says how to delete a student's data by hand (WEB-012), pending SYS-Q05.
+3. The runbook says how to delete a student's data by hand (WEB-012, SYS-Q05).
 Status: Planned

@@ -1,6 +1,6 @@
 # Database AGENTS.md
 
-Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This area is shared (see "Shared Ownership" in `planning/architecture/AGENTS.md`; pending confirmation in SYS-Q02).
+Owners: Ryan Fusco (coordinator), Graham Cohick, Luke Campbell. This area is shared (see "Shared Ownership" in `planning/architecture/AGENTS.md`; confirmed in SYS-Q02).
 Contributors: —
 
 This file is the working agreement for agents in the database area. It explains how to find your way around the area and what you may do here. It has no design or implementation content. That lives in `architecture.md` and `implementation-plan.md`.
@@ -16,16 +16,16 @@ Every area depends on this design, so it's coordinated in one place rather than 
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-23
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. DB-I05 is Accepted. DB-I01 to DB-I04 and DB-001 have Ryan Fusco's acceptance (DB-I03 also has Graham Cohick's) and wait on the other owners. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-18. Update it with every change to the design. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. DB-T01 to DB-T03. Blocked until Graham Cohick and Luke Campbell accept DB-I01 to DB-I04 and DB-001 (DB-I05 is Accepted). Every owner must agree to changes. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Access Patterns, Item Types, Interfaces, Open Questions | Draft. DB-001 and DB-I01 to DB-I05 (DB-I04 base) are Accepted. DB-I04 amendment A (regeneration) is Proposed, waiting for Luke Campbell. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-23. Update it with every change to the design. |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. DB-T01 to DB-T03. All Planned. The regeneration parts of DB-T02 and DB-T03 wait on DB-I04 amendment A. Every owner must agree to changes. |
 
 Where to look:
 

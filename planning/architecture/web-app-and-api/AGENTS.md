@@ -14,16 +14,16 @@ Web App and API is how a student gets into Froop and uses it: signing in, upload
 ## Status
 Project phase: 1. Architecture Planning
 Area state: Draft
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-23
 
 ## Files
 
 | File | Holds | Status |
 |---|---|---|
 | `AGENTS.md` | This guide | Current. Purpose and ground rules approved by the owner on 2026-11-18. |
-| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-013, Interfaces (WEB-I01 and WEB-I02, both Proposed), and Open Questions have content (WEB-Q01 to WEB-Q07 answered; WEB-Q05 and WEB-Q08 open). Requests From Other Areas is empty. |
-| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-20. It carries the IDs of the Accepted decisions, the presigned POST (EB-018), and the API's link to job discovery for refresh and regeneration (JDM-I01, JDM-I05, WEB-013). Its dashed "Still open" box lists WEB-Q08, WEB-012, and the two Proposed interfaces. The PNG was rendered from the `.drawio` with a small script and `rsvg-convert`, because neither draw.io nor a working headless browser was available, so arrow routing and text wrapping may differ slightly from a draw.io export. |
-| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. 16 tasks (WEB-T01 to WEB-T16). WEB-T01 and WEB-T11 are Planned, and the rest are Blocked on named decisions, interfaces, or questions. |
+| `architecture.md` | Scope, Initial Architecture, Architecture Review, Decisions, Interfaces, Open Questions, Requests From Other Areas | Draft. Scope (confirmed), Initial Architecture, Architecture Review (17 findings), Decisions WEB-001 to WEB-013, Interfaces (WEB-I01 Accepted; WEB-I02 Proposed, waiting for Luke Campbell), and Open Questions have content (WEB-Q01 to WEB-Q08 answered). Requests From Other Areas is empty. |
+| `architecture.drawio`, `architecture.png` | The current design diagram, embedded in `architecture.md` | Current as of 2026-11-23. It carries the IDs of the Accepted decisions, the presigned POST (EB-018), and the API's link to job discovery for refresh and regeneration (JDM-I01, JDM-I05, WEB-013). Its dashed "Still open" box lists WEB-Q08, WEB-012, and the two Proposed interfaces. The PNG was rendered from the `.drawio` with a small script and `rsvg-convert`, because neither draw.io nor a working headless browser was available, so arrow routing and text wrapping may differ slightly from a draw.io export. |
+| `implementation-plan.md` | Ordered tasks with acceptance criteria | Draft. 16 tasks (WEB-T01 to WEB-T16). WEB-T10, WEB-T12, and WEB-T14 are Blocked on DB-I04 amendment A (waiting for Luke Campbell); the rest are Planned. |
 
 Where to look:
 

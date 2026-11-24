@@ -71,7 +71,7 @@ Consequences:
 
 ## Access Patterns
 
-Every way the data is read or written. They come from the RFC (pp.4–5) and the decisions since. Rows follow their defining contracts; DB-I02 and the regeneration amendment remain Proposed. Nothing goes into the table design unless a row here needs it.
+Every way the data is read or written. They come from the RFC (pp.4–5) and the decisions since. Rows follow their defining contracts; only the regeneration amendment (DB-I04 amendment A) remains Proposed. Nothing goes into the table design unless a row here needs it.
 
 | ID | Access pattern | Needed by | Served by | Source |
 |---|---|---|---|---|
@@ -95,10 +95,12 @@ Every way the data is read or written. They come from the RFC (pp.4–5) and the
 | DB-AP18 | Persist dispatcher continuation/lease | dispatcher | SYSTEM#JDM / DISPATCH#{passType} | JDM-003 |
 | DB-AP19 | List a user's private sources | web-app-and-api | GSI1 `USER#{sub}#SOURCES` (DB-I04) | RFC p.5, DB-I04 |
 | DB-AP20 | List a board's postings, to reconcile after a complete poll | job-discovery-and-matching | GSI1 `BOARD#{boardToken}#POSTINGS` (DB-I04) | JDM-002, DB-I04 |
+| DB-AP21 | Admit a regeneration request: request key, work item, and the match's active request, in one transaction | web-app-and-api (per match), job-discovery-and-matching (fan-out children) | `USER#{sub}` / `REGENREQ#…`, `WORK#…`, `MATCH#…` (DB-I04 amendment A, Proposed) | JDM-I05, WEB-013 |
+| DB-AP22 | Save and resume an upload regeneration's fan-out position | job-discovery-and-matching | `USER#{sub}` / `WORK#regen-upload:{docId}`, `fanoutCursor` (DB-I04 amendment A, Proposed) | JDM-I05 |
 
 ## Item Types
 
-The item types listed in RFC p.5. Rows follow their defining contracts; DB-I02 and the regeneration amendment remain Proposed.
+The item types listed in RFC p.5. Rows follow their defining contracts; only the regeneration amendment (DB-I04 amendment A) remains Proposed.
 
 | Item type | `PK` | `SK` | Written by (area) | Read by | Definition |
 |---|---|---|---|---|---|
@@ -113,6 +115,7 @@ The item types listed in RFC p.5. Rows follow their defining contracts; DB-I02 a
 | Work | USER#{sub} | WORK#{workId} | job-discovery-and-matching | JDM workers | DB-I04 |
 | Dispatcher checkpoint | SYSTEM#JDM | DISPATCH#{passType} | job-discovery-and-matching | dispatcher | DB-I04 |
 | Cost reservation | USER#{sub} | COSTRES#{attemptId} | parser/Matcher via JDM-I04 | parser/Matcher | DB-I04 |
+| Regeneration request key | `USER#{sub}` | `REGENREQ#{requestId}` | web-app-and-api | web-app-and-api | DB-I04 amendment A (Proposed) |
 
 ## Interfaces
 
@@ -135,11 +138,11 @@ Accepted by: Ryan Fusco (2026-11-19), Graham Cohick (2026-11-19). Luke Campbell 
 
 #### DB-I02: Experience items
 **Luke's answer (2026-11-21):** Agree bank ownership, verbatim fields, current-version pointer and fixed statuses. Withhold final schema acceptance until DB-Q10 separates upload-link expiry from TTL. Canonical/dictionary fields are deferred with EB-007, not required in v1.
-Status: Proposed
+Status: Accepted (2026-11-23). DB-Q10, the one condition Luke Campbell set, is agreed by all three owners in the form he proposed.
 Written by: experience-bank
 Consumers: experience-bank only. The Matcher, the Renderer, and the API read and delete through the experience bank package (EB-I03, EB-010).
 Contract: Item types under `PK=USER#{sub}`, `SK=DOC#…`:
-- **Upload record:** `docId`, file name, status (`awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`; `expired` is reported once `expiresAt` passes with no file), error reason, upload time, `expiresAt`, and the student's `regenerate` choice (EB-019). Only `.tex` files are accepted (EB-001).
+- **Upload record:** `docId`, file name, status (`awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`; `expired` is reported once `uploadExpiresAt` passes with no file), error reason, upload time, `uploadExpiresAt` (the link deadline; not the TTL attribute, DB-Q10), and the student's `regenerate` choice, kept for display only (EB-019, WEB-Q08). Only `.tex` files are accepted (EB-001).
 - **Section:** its heading (`source` and `text`), its category (`education`, `experience`, `projects`, `technical_skills`, `awards`, `certifications`, `publications`, `leadership`, or `other`), and its position (EB-016, Proposed).
 - **Entry (role, education entry, or project):** a stable ID, the entry type, its section, its position, and its heading fields (for example title, organization, and dates), each with `source` and `text` (EB-012).
 - **Bullet:** a stable `bulletId`, `source`, `text`, the entry it belongs to, and its position.
@@ -149,8 +152,8 @@ Contract: Item types under `PK=USER#{sub}`, `SK=DOC#…`:
 - **Header block:** `source` and `text` (EB-014).
 - **Current-upload pointer:** a per-user item naming the current `docId` (EB-008, Proposed).
 
-The exact sort-key formats follow DB-I01. `source` and `text` are never modified after they're written. A new upload replaces the whole set (EB-002).
-Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank), Graham Cohick (2026-11-19). Luke answered 2026-11-21: final acceptance awaits DB-Q10.
+The exact sort-key formats follow DB-I01. `source` and `text` are never modified after they're written. A new upload replaces the whole set (EB-002). **TTL (DB-Q10):** the current upload's record and its items never carry the TTL attribute `expiresAt`. Only items that are no longer current get it, as the safety net in EB-008.
+Accepted by: Ryan Fusco (2026-11-19, writer: experience-bank; re-confirmed with the DB-Q10 change 2026-11-23), Graham Cohick (2026-11-19; the DB-Q10 change 2026-11-23), Luke Campbell (2026-11-21, conditional on DB-Q10, which is now agreed). Canonical/dictionary fields on skills are deferred with EB-007 and not in v1.
 
 #### DB-I03: Match delivery state
 **Luke's reasoning (2026-11-21):** Conditional delivery updates protect current generations; S3 history avoids an ever-growing item. Matcher-owned digest marks agree with JDM-007.
@@ -160,7 +163,7 @@ Consumers: web-app-and-api (shows the state), job-discovery-and-matching
 Contract: Attributes on `USER#{sub}` / `MATCH#{postingKey}`:
 - `renderStatus` (pending, rendered, skipped, failed), `renderReason` (for example `bank_replaced`, DEL-003), `renderedAt`
 - `pdfKey`: the current resume, `resume/{sub}/{postingKey}/g{generation}.pdf` (DEL-009). Earlier resumes are listed from that S3 folder, not stored on the item (DB-Q08).
-- `generation` and `requestId` of the latest render request. Every delivery-state write is conditional on `generation` (DEL-017).
+- `generation` and `requestId` of the latest render request. Every delivery-state write is conditional on `generation` (DEL-017). *(Who sets `generation` is clarified by DB-I04 amendment A: whoever admits a render request sets it, and delivery only checks it.)*
 - `notifyStatus` (pending, sending, sent, failed), `sendingSince`, `sentAt`. Emails are sent at most once (DEL-018).
 - the GSI2 keys that mark a match as waiting for a digest (format above, DEL-020). The Matcher writes them when it creates the match (for hourly and daily students). The Notifier removes them after sending, or when the match was skipped or failed, and moves still-pending matches to the next window's bucket (DEL-011, DEL-020).
 
@@ -185,6 +188,36 @@ Contract:
 - **Digest index:** preserve DB-I03 ownership, but GSI2 keys and timing are defined by DB-I03/DEL-020 and agreed by Luke under JDM-007; overall shared schema approval remains pending (DB-Q09). *Ryan Fusco's answer (2026-11-18): buckets by send window, with hourly sends at the top of each UTC hour and daily sends at 13:00 UTC (DEL-020, DB-I01, DB-I03).*
 Accepted by: Ryan Fusco (2026-11-19; the complexity risk in JDM-Q04 still stands), Graham Cohick (2026-11-19; the pending regeneration amendment below comes back to him separately). Luke Campbell (2026-11-21). DB-I01/I03 are Accepted; DB-I02 remains Proposed pending DB-Q10.
 
+#### DB-I04 amendment A: Regeneration commands
+Status: Proposed. Drafted by Ryan Fusco (2026-11-23), from JDM-I05, JDM-011, and WEB-013.
+Written by: web-app-and-api (creates commands), job-discovery-and-matching (every later state change)
+Consumers: job-discovery-and-matching, web-app-and-api, delivery (reads `generation`)
+Contract: adds to DB-I04. Every field DB-I04 already defines is unchanged.
+- **Work type.** Work items gain `workType`: `new_match`, `upload_regenerate`, or `per_match_regenerate`. Work written before this amendment is `new_match`.
+- **Upload regeneration command** (JDM-I05, JDM-011):
+  - `PK=USER#{sub}`, `SK=WORK#regen-upload:{docId}`; `workType=upload_regenerate`, `targetDocId={docId}`, `requestId` (equal to the work ID), `requestedAt`, `reason=regenerate`, `state=pending`, `fanoutCursor` (absent until fan-out starts), plus DB-I04's lease fields.
+  - The API creates it with `attribute_not_exists(PK)`, only when `regenerate` is true, before it returns the upload form (WEB-013). A repeat with the same `docId` is a no-op.
+  - The dispatcher finds it through the existing recovery scan (DB-AP16). It fans out only when `upload_status(sub, targetDocId)` is `parsed` or `parsed_with_unclassified` and is the current bank.
+  - It ends `complete`, or `failed` with `errorCode` `upload_failed`, `upload_expired`, `upload_superseded`, or `upload_not_completed` (the 24-hour fallback, JDM-011).
+  - `fanoutCursor` is the serialized position in the DB-AP13 query, saved after each page, so a retry resumes and never skips later matches.
+- **Child work, one per match in the window:** `SK=WORK#regen:{parentRequestId}:{postingKey}`; `workType=per_match_regenerate`, `postingKey`, `parentRequestId`, `requestId={parentRequestId}`. Created conditionally, so a repeated page creates nothing new.
+- **Per-match command** (`POST /matches/{postingKey}/regenerate`): `SK=WORK#regen:{requestId}:{postingKey}`, where `requestId` is the `Idempotency-Key` UUID; `workType=per_match_regenerate`, `postingKey`, `requestedAt`, `generation`.
+- **Request-key item** (new item type): `PK=USER#{sub}`, `SK=REGENREQ#{requestId}`; `itemType=RegenerationRequest`, `postingKey`, `workId`, `createdAt`. It lets the API tell a replay (same key, same match: return the same 202) from a reused key (same key, other match: 409).
+- **On the Match item** (JDM-owned fields): `activeRegenerationRequestId` and `activeRegenerationGeneration`.
+- **Who sets `generation` (clarifies DB-I03):** whoever admits a render request. The Matcher sets it to 1 when it creates the match; a regeneration's admission (below) raises it by 1. Delivery never changes `generation`. It checks it on every write (DEL-017) and writes `requestId` and the render fields.
+- **Admission, one transaction** (DB-AP21), for a per-match command or for each child:
+  1. put the request-key item (per-match only), conditional on `attribute_not_exists(SK)`
+  2. put the work item, conditional on `attribute_not_exists(SK)`
+  3. update the match: set `activeRegenerationRequestId = :rid`, `generation = generation + 1`, `activeRegenerationGeneration` to that new value; conditional on the match existing and `attribute_not_exists(activeRegenerationRequestId)`. **For a per-match command only,** also conditional on `renderStatus <> pending`.
+
+  If step 3 fails because another request is active, the API returns 409 (`regeneration_in_progress`). If it fails because the match's resume is still rendering, the API returns 409 (`render_in_progress`) and the student tries again later. This follows JDM-004: a regeneration doesn't replace a render that's still running.
+- **Fan-out children after an upload are admitted even while a render is pending.** That older render was built from the replaced bank, so the Renderer skips it anyway (DEL-003), and the raised `generation` makes it drop the render (DEL-017). If that match was in instant mode, its email is lost; the new resume still appears in the dashboard, and regenerations never send email (DEL-008). If steps 1 and 2 fail because the same key was already used for the same match, the API returns the stored 202 and `requestId`.
+- **Release:** job-discovery-and-matching removes `activeRegenerationRequestId` and `activeRegenerationGeneration` when the work reaches a final state, conditional on both still holding this request's values. A pending render handoff doesn't release it.
+- **Delivery:** unchanged. The Renderer already drops a render whose `generation` is lower than the match's (DEL-017), so an older render that finishes late loses.
+- **Retention:** commands, child work, and request-key items have no TTL while the match exists, like other final work (DB-I04).
+- **New access patterns:** DB-AP21 (admit a regeneration request in one transaction) and DB-AP22 (save and resume the fan-out cursor). Finding pending commands reuses DB-AP16, and choosing matches reuses DB-AP13.
+Accepted by: Ryan Fusco (2026-11-23), Graham Cohick (2026-11-23). Waiting for: Luke Campbell.
+
 #### DB-I05: Profile and Settings items
 Status: Accepted (2026-11-19). Proposed by Graham Cohick, whose area writes both items (answers his part of DB-Q01). Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009), Ryan Fusco (2026-11-19).
 Written by: web-app-and-api
@@ -206,7 +239,7 @@ Contract:
 Why the default title filter: empty filters mean no restriction (JDM-005), so a new student who subscribes to a large board would otherwise trigger a ranking call for every posting on it. Whether `intern` also matches "Internship" depends on how the Matcher compares terms (WEB-Q06).
 Accepted by: Graham Cohick (2026-11-18), Luke Campbell (2026-11-18; JDM-009), Ryan Fusco (2026-11-19).
 
-**Pending regeneration amendment (JDM-I05):** add workType, targetDocId, requestedAt, fanout cursor and per-match request idempotency/active-request fields to DB-I04 only after Graham/Ryan agree. API conditionally creates command records, JDM transitions them. Existing DB-I04 is not silently accepted by this proposal.
+**Regeneration amendment (JDM-I05):** drafted below as DB-I04 amendment A (2026-11-23).
 
 ### Consumes
 - **Provisioning of the table in each environment:** OPS-I02 from `build-and-operation`.
@@ -251,8 +284,10 @@ Proposed answers at source (2026-11-18): DB-Q01 discovery-owned fields above; DB
   - Owner: Luke Campbell (writes the cost counters), Ryan Fusco
   - Blocks: OPS-002, OPS-010, EB-017
 
-- **DB-Q10: Separate upload-link expiry from item deletion.** Owner: Ryan Fusco (bank writer), Graham Cohick and Luke Campbell (shared schema). Blocks: final DB-I02 acceptance and DB-T02/T03.
+- **DB-Q10: Separate upload-link expiry from item deletion.** *Resolved 2026-11-23.* Owner: Ryan Fusco (bank writer), Graham Cohick and Luke Campbell (shared schema). Blocked: final DB-I02 acceptance and DB-T02/T03.
   - **Luke's proposed answer (2026-11-21):** Persist the 15-minute deadline as uploadExpiresAt; keep the public create_upload response's expiresAt field unchanged. Reserve the table TTL attribute expiresAt for intentional record deletion. Current upload metadata and its current-bank items have no TTL; link expiry alone must never delete them. Apply retention/cleanup only when an item is no longer current, under the bank cleanup policy.
+  - **Ryan Fusco agrees (2026-11-23).** EB-019 is amended to match, and DB-I02 above now uses `uploadExpiresAt`.
+  - **Graham Cohick agrees (2026-11-23).** Resolved: all three owners agree.
   - Reasoning: DB-T01 selects expiresAt as the table TTL attribute, while EB-019/DB-I02 reuse that name for the link deadline. [DynamoDB TTL documentation](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/time-to-live-ttl-how-to.html) specifies one attribute name for deletion eligibility. Luke agrees to the proposed separation; Ryan and Graham must confirm it before the shared schema is changed.
 
 ## Requests From Other Areas
@@ -261,4 +296,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| JDM-Q03, DB-I04 | `job-discovery-and-matching/architecture.md`; this file | Review the complete discovery/work/cost schema, GSI3 proposal and open digest/history details with all owners. |
+| DB-I04 amendment A | this file | Luke Campbell: review and accept the regeneration amendment (Ryan Fusco and Graham Cohick have accepted). |

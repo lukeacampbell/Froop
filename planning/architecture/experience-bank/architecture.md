@@ -242,19 +242,19 @@ Consequences:
 - The delivery template has to define, or safely strip, the macros of the supported templates (EB-011).
 
 ### EB-013: Over the cost cap, accept the upload and mark leftovers unclassified
-Status: Accepted (Ryan Fusco, 2026-11-16)
+Status: Accepted (Ryan Fusco, 2026-11-16). Its retry is superseded by EB-020.
 Date: 2026-11-16
 Context: Answers EB-Q11.
 Decision: If the hourly cost cap is reached while the parser has leftover sections, the upload still succeeds:
 - Sections parsed without the LLM are banked as usual and replace the old bank (EB-002).
-- Leftover sections are stored, marked `unclassified`, and retried after the cap resets.
+- Leftover sections are stored, marked `unclassified`, and retried after the cap resets. *(The retry is superseded by EB-020: no automatic retry in v1.)*
 - The upload status becomes "parsed, with unclassified sections", and the dashboard shows it.
 Alternatives:
 - Fail the upload and keep the old bank. Rejected: the deterministic sections are usually most of the resume.
 Consequences:
 - The upload status gains a value.
 - The Matcher ignores unclassified items until they're classified.
-- A retry mechanism is needed. It could be a scheduled pass, or a retry queued for after the cap window.
+- A retry mechanism is needed. It could be a scheduled pass, or a retry queued for after the cap window. *(Superseded by EB-020.)*
 
 ### EB-014: Extract the resume header block verbatim
 Status: Accepted (Ryan Fusco, 2026-11-17)
@@ -301,13 +301,13 @@ Consequences:
 - Splitting skills on commas has to respect braces and escaped characters. For example, `C/C++` is one skill, and so is `Node.js`.
 
 ### EB-017: The parser reserves Bedrock budget through the shared reservation package
-Status: Accepted (Ryan Fusco, 2026-11-18). Supersedes EB-004's mechanism; parser calls still count toward the caps.
+Status: Accepted (Ryan Fusco, 2026-11-18). Supersedes EB-004's mechanism; parser calls still count toward the caps. Its retry at `nextAttemptAt` is superseded by EB-020.
 Date: 2026-11-18
 Context: Answers C5 from the review of Luke Campbell's JDM-006 and JDM-I04. Checking a counter and then adding to it lets two callers both pass the check and overspend.
 Decision:
 - Before every Bedrock call, the parser calls `reserve(...)` from the shared reservation package (JDM-I04), using a new attempt ID for each call.
 - The package atomically reserves a worst-case cost (input tokens plus the configured maximum output tokens) against the per-user hourly, platform hourly, and platform daily counters.
-- **Deferred:** the leftover sections stay `unclassified` (EB-013) and are retried at the returned `nextAttemptAt`.
+- **Deferred:** the leftover sections stay `unclassified` (EB-013) and are retried at the returned `nextAttemptAt`. *(Superseded by EB-020: no automatic retry in v1.)*
 - **Blocked configuration:** the upload status notes that the leftovers couldn't be classified.
 - Counter keys follow DB-I04 (`COST#HOUR#…`, `COST#DAY#…`, and per-user `USER#{sub}` / `COST#HOUR#…`).
 - **Keeping the overcount small:** the parser's maximum output tokens are kept close to real usage, and its actual token usage is logged, so the cap isn't wasted on overestimates.
@@ -357,21 +357,42 @@ Alternatives:
 Consequences:
 - **EB-I03** gains `create_upload` and the `docId` form of `upload_status`. The consumers accepted EB-I03 before these were added, so they need to accept the extension.
 - **DB-I02's upload record** gains `awaiting_file`, `expired`, `expiresAt`, and `regenerate`.
-- **The API stores the regenerate choice through this package.** Luke Campbell's dispatcher reads it through `upload_status` (JDM-I05). That's one record, not two.
+- **The API stores the regenerate choice through this package.** Luke Campbell's dispatcher reads the upload's status through `upload_status` (JDM-I05).
+
+**Amended 2026-11-23 (Ryan Fusco), following WEB-Q08, JDM-011, and DB-Q10:**
+- **The work record is the only regeneration trigger.** When the student opts in, the API writes the `regen-upload:{docId}` work record (JDM-I05, WEB-013). The `regenerate` value on the upload record only records the student's choice, for display. Nothing reads it to start regeneration. This replaces the earlier wording that the choice lives in "one record, not two".
+- **An upload that ends `expired` or `failed` ends its regeneration command** without regenerating anything. The dispatcher's 24-hour timeout stays only as a fallback for an upload that never reaches a final status (JDM-011).
+- **The link deadline is stored as `uploadExpiresAt`,** not `expiresAt`. `expiresAt` is the table's TTL attribute (DB-T01), and reusing the name would let DynamoDB delete a current bank's upload record 15 minutes after its link expired (DB-Q10). `create_upload` still returns the deadline to callers as `expiresAt`.
+- **The current upload's record and its bank items have no TTL.** TTL applies only to items that are no longer current (EB-008).
+
+### EB-020: No automatic retry of unclassified sections in v1
+Status: Accepted (Ryan Fusco, 2026-11-23). Supersedes the retry in EB-013 and EB-017; everything else in them stands.
+Date: 2026-11-23
+Context: EB-013 and EB-017 say unclassified leftover sections are retried after the cost cap resets (`nextAttemptAt`). Nothing in the design runs that retry: the parser has no schedule or queue of its own, SQS can delay a message by 15 minutes at most, and a cap can reset hours later. The experience-bank diagram already shows no retry path.
+Decision:
+- When a reservation is `deferred`, the leftover sections are stored as `unclassified` and the upload status is `parsed_with_unclassified`. Nothing retries them.
+- The dashboard tells the student that some sections weren't classified. Uploading again tries again.
+- The Matcher keeps ignoring unclassified items (EB-013).
+Alternatives:
+- A WORK item picked up by Luke Campbell's dispatcher. Rejected for v1: a dependency on another area's state machine for a rare case.
+- A one-off EventBridge schedule per upload. Rejected: schedules to create and clean up for a rare case.
+Consequences:
+- With Jake's Resume, nearly every section is parsed without Bedrock (EB-003, EB-015), so this rarely matters.
+- EB-T06 drops its retry criterion.
 
 ## Interfaces
 
 ### Provides
 
 #### EB-I01: Upload object contract
-Status: Proposed (revised 2026-11-19: presigned POST, EB-018)
+Status: Accepted (2026-11-19; revised the same day for the presigned POST, EB-018)
 Consumers: web-app-and-api
 Contract:
 - **Key:** `uploads/{sub}/{docId}.tex`, where `sub` comes from the Cognito token and never from the request (RFC p.7).
 - **Upload:** one object per **presigned POST** (EB-018). The policy fixes the key, the content type `application/x-tex`, a size of 1 byte to 1 MB, and a 15-minute expiry. `create_upload` builds it (EB-019).
 - **User identity:** the parser takes the user from the key, so the key layout is part of the security model.
 - **Replacement:** a new upload replaces the bank only once it has parsed successfully (EB-002).
-Accepted by: Ryan Fusco (2026-11-19, provider), Graham Cohick (2026-11-19, consumer: web-app-and-api). Both owners have accepted; the Status line is Ryan Fusco's to update.
+Accepted by: Ryan Fusco (2026-11-19, provider), Graham Cohick (2026-11-19, consumer: web-app-and-api).
 
 #### EB-I02: Term resolver
 Status: Deferred with EB-007 (2026-11-18)
@@ -383,23 +404,23 @@ Contract:
 Accepted by: —
 
 #### EB-I03: Experience bank package
-**Luke's extension acceptance (2026-11-21):** Accept create_upload and upload_status(sub, docId), the fixed status list and isCurrentBank: they let JDM wait for the requested successful current bank without reading DOC items. All consumers have accepted the extension; Ryan can finalize its status. WEB-Q08 separately clarifies that the WORK record triggers regeneration, and DB-Q10 separates link expiry from data retention.
-Status: Accepted (base contract). The EB-019 extension is Proposed until the consumers accept it.
+**Luke's extension acceptance (2026-11-21):** Accept create_upload and upload_status(sub, docId), the fixed status list and isCurrentBank: they let JDM wait for the requested successful current bank without reading DOC items. WEB-Q08 separately clarifies that the WORK record triggers regeneration, and DB-Q10 separates link expiry from data retention (both settled in the EB-019 amendment).
+Status: Accepted, including the EB-019 extension (2026-11-23).
 Consumers: web-app-and-api (`GET /experience`, delete), job-discovery-and-matching (the Matcher), delivery (the Renderer)
 Contract: A Python package owned by this area (EB-010). It is the only supported way to use the bank:
 - `get_bank(sub)`: the current upload's `docId`, status, and header block (EB-014). Then its items grouped by section category (EB-016): education entries, roles, projects (each with their bullets), skills grouped by skill category, and `other` sections. Every item has `source` and `text` (EB-012).
 - `get_items(sub, ids)`: specific items by ID. Missing IDs (replaced by a newer upload) are reported, not raised as errors.
 - `delete_bank(sub)`: deletes the bank and the uploaded file
-- `create_upload(sub, regenerate=False)`: issues a `docId`, writes the upload record (`awaiting_file`), and returns the presigned POST (EB-018, EB-019). *(extension, Proposed)*
-- `upload_status(sub, docId=None)`: `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed` (with a reason), or `expired`. With a `docId`, it reports that upload and whether it is the current bank (EB-019). *(the `docId` form and the full status list are the extension, Proposed)*
+- `create_upload(sub, regenerate=False)`: issues a `docId`, writes the upload record (`awaiting_file`), and returns the presigned POST (EB-018, EB-019).
+- `upload_status(sub, docId=None)`: `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed` (with a reason), or `expired`. With a `docId`, it reports that upload and whether it is the current bank (EB-019).
 - `resolve(term)`: the term resolver (EB-I02). Deferred with EB-007, so it isn't in v1.
 - `supported_templates()`: the supported templates and their macros (EB-015), used by the parser and by the delivery template
 
 Function names may change before acceptance. What a function returns may change only with the consumers' agreement.
-Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list are Proposed. Graham Cohick accepted the extension (2026-11-19, consumer: web-app-and-api). Luke Campbell accepts the extension (2026-11-21; reasoning above).
+Accepted by: Graham Cohick (2026-11-18, consumer: web-app-and-api), Luke Campbell (2026-11-18, consumer: job-discovery-and-matching; JDM-008). Ryan Fusco (2026-11-19, provider). The base contract is Accepted. **Extension (EB-019):** `create_upload`, `upload_status(sub, docId)`, and the fixed status list. Accepted by Graham Cohick (2026-11-19, consumer: web-app-and-api), Luke Campbell (2026-11-21, consumer: job-discovery-and-matching), and Ryan Fusco (2026-11-23, provider, and consumer for delivery).
 
 ### Consumes
-- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), the section categories, entries, and skill categories (EB-016), and the upload record's new statuses, `expiresAt`, and `regenerate` (EB-019).
+- **Experience items:** DB-I02 in `database`. This area writes them and is now their only direct reader (EB-010). It proposes changes to them as a contributor there. Pending changes: the current-upload pointer (EB-008), the `source` and `text` fields (EB-012), the `unclassified` marker and new status value (EB-013), the header block (EB-014), the section categories, entries, and skill categories (EB-016), and the upload record's new statuses, `uploadExpiresAt`, and `regenerate` (EB-019, as amended for DB-Q10).
 - **The user's Cognito `sub`:** through the upload key (EB-I01), which `web-app-and-api` issues.
 - **Bedrock, and the shared reservation package:** JDM-I04, owned by `job-discovery-and-matching` (EB-017). Ryan Fusco accepted it on 2026-11-18 as the consumer.
 - **The uploads bucket with event notifications, the shared table, the parser Lambda image, and its IAM role:** from `build-and-operation` (OPS-I01, OPS-I02, OPS-I03).
@@ -412,8 +433,9 @@ Answered: EB-Q01–Q06 (EB-001 to EB-006), EB-Q07 (EB-010), EB-Q08 (EB-011, sinc
   - `DELETE /uploads/{docId}` needs to become something like `DELETE /experience`. It's marked pending in the revised RFC.
     - *Answered by Graham Cohick (2026-11-18): it becomes `DELETE /experience` (WEB-001, Accepted). The revised RFC is updated.*
   - The group needs to confirm the Summary, Goal 3, and Demo step 1 changes, since those are shared sections. *Ryan Fusco asked Graham Cohick and Luke Campbell to confirm (2026-11-19), through their Requests From Other Areas tables. Graham Cohick confirms the wording (2026-11-19). Luke Campbell confirms the Summary, Goal 3 and Demo step 1 (2026-11-21): one LaTeX resume and verbatim bullets match the agreed Matcher inputs and avoid text generation. Shared wording is now agreed.*
+  - *Resolved (2026-11-23): both parts are answered, and EB-I01 is Accepted.*
   - Owner: Graham Cohick (API), group (shared sections)
-  - Blocks: EB-I01 acceptance
+  - Blocks: nothing
 
 ## Requests From Other Areas
 
@@ -421,6 +443,4 @@ Pointers to items defined in other areas that this area's owner has to act on. A
 
 | ID | Defined in | What's needed |
 |---|---|---|
-| WEB-Q08 | `web-app-and-api/architecture.md` | With Luke Campbell: confirm that the JDM-I05 work record, not the `regenerate` value on the upload record (EB-019), is what triggers upload regeneration, and say what that value is then for. |
 | _None yet._ | | |
-| DB-Q10 | database/architecture.md | Ryan: agree a separate upload link deadline from table TTL; active upload metadata must survive link expiry. |

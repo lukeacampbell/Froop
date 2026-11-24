@@ -293,7 +293,7 @@
             <mxPoint x="1285" y="770" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="c71" edge="1" parent="1" style="edgeStyle=none;html=1;strokeColor=#334155;strokeWidth=1.6;fontSize=11;labelBackgroundColor=#f8fafc;endArrow=block;endFill=1;" value="instant cadence">
+        <mxCell id="c71" edge="1" parent="1" style="edgeStyle=none;html=1;strokeColor=#334155;strokeWidth=1.6;fontSize=11;labelBackgroundColor=#f8fafc;endArrow=block;endFill=1;" value="instant: async invoke (DEL-021)">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1190" y="799" as="sourcePoint" />
             <mxPoint x="690" y="799" as="targetPoint" />

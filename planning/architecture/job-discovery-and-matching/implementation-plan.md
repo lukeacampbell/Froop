@@ -7,7 +7,7 @@ This is the Greenhouse-only build plan. JDM-001/006/007/008/009 are Accepted; JD
 
 Recommended order: adapter and identity → data/recovery foundation → API and polling → ranking/budget → delivery/regeneration → integration. Each Phase 2 task includes unit tests for its acceptance criteria; cross-area/system test plans belong to Phase 3.
 
-**2026-11-21 dependency update:** JDM-I01 and base JDM-I05 have producer/consumer agreement; DB-I01/I03/I04 base and OPS-I05 are Accepted. Remaining regeneration blockers: WEB-Q08/JDM-011 confirmation by Ryan and the DB-I04 amendment. OPS-I01 to I04 await Ryan. Keep conditional generation ownership, pagination and atomic reservations; review JDM-T02/T04 on November 30 (JDM-012). Provider tasks now include DB-T01/T02, OPS-T02 to T08, EB-T01/T02 and DEL-T04 to T07. Phase 1 remains current.
+**2026-11-21 dependency update:** JDM-I01 and base JDM-I05 have producer/consumer agreement; DB-I01/I03/I04 base and OPS-I05 are Accepted. Remaining regeneration blocker: DB-I04 amendment A (drafted 2026-11-23; Ryan and Graham accept, Luke to review). WEB-Q08/JDM-011 and OPS-I01 to I04 were settled on 2026-11-23. Keep conditional generation ownership, pagination and atomic reservations; review JDM-T02/T04 on November 30 (JDM-012). Provider tasks now include DB-T01/T02, OPS-T02 to T08, EB-T01/T02 and DEL-T04 to T07. Phase 1 remains current.
 ### JDM-T01: Implement the Greenhouse adapter
 Depends on: JDM-001; approved Phase 2 transition
 Acceptance criteria:
@@ -54,7 +54,7 @@ Acceptance criteria:
 3. UTC hour/day boundaries and counter expiry are explicit; uncertain calls remain charged and actual usage is logged separately.
 4. Denied work returns the correct latest exhausted-window reset; a call larger than an entire cap or unknown pricing returns blocked configuration.
 5. Parser and Matcher use the same package contract; parser adoption is EB-T06 in `experience-bank/implementation-plan.md` (JDM-Q02).
-Status: Blocked (OPS-I01 to I04 await Ryan; JDM-I04, DB-I04 base and OPS-I05 agreed)
+Status: Planned (JDM-I04, DB-I04 base, OPS-I01 to I05 agreed)
 
 ### JDM-T06: Implement bank-aware structured ranking
 Depends on: JDM-T02, JDM-T05, JDM-005, EB-I03, JDM-Q02
@@ -93,7 +93,7 @@ Acceptance criteria:
 2. Per-match regeneration authorizes ownership and uses retained posting details even when the original posting is gone.
 3. Command retries with the same request ID do not create a second operation; new requests receive monotonically increasing generations.
 4. Regeneration produces no new digest mark or email and keeps previous PDFs according to delivery's contract.
-Status: Blocked (WEB-Q08/JDM-011 clarification and DB-I04 regeneration amendment; predecessor tasks pending; WEB-T10 linked)
+Status: Blocked (DB-I04 regeneration amendment; JDM-011 Accepted 2026-11-23; predecessor tasks pending; WEB-T10 linked)
 
 ### JDM-T10: Wire infrastructure, metrics and operating instructions
 Depends on: JDM-T04/T05/T08/T09, OPS-I05, JDM-Q03, SYS-Q04
@@ -103,4 +103,4 @@ Acceptance criteria:
 3. JSON logs and metrics cover poll success/failure, matches, work age, deferred budget, invalid ranking and spend without resume/job bodies or sensitive fields.
 4. Operating instructions explain seed, refresh, investigate failure, fix cause and redrive without duplicate matches; documented limitations include scan scaling, conservative budget accounting and email uncertainty.
 5. Group agrees revised Greenhouse demo: catalog plus user-added board, repeated poll without duplicate matches, tailored PDF, isolated board failure. Integration validation waits for the approved Phase 3/4 plan.
-Status: Blocked (shared infrastructure tasks and OPS-I01 to I04 acceptance; shared Greenhouse demo wording is agreed)
+Status: Blocked (JDM-003/004 remain Proposed, through JDM-T04; OPS-I01 to I05 Accepted; shared Greenhouse demo wording is agreed)

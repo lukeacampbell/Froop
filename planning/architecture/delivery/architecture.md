@@ -11,7 +11,7 @@ Source: RFC 0001 (`architecture/inputs/Froop_inital_architecture.pdf`), pp.1–5
   - Fits the highest-ranked items onto one page by estimating, rendering, and pruning (DEL-005), using the section tiers (DEL-015) and the fill order (DEL-013).
   - Builds the resume from each item's LaTeX `source` (EB-012), keeping only the macros the Froop template defines (DEL-001, DEL-002).
   - Writes the PDF to `resume/` (DEL-I01).
-  - For instant delivery, hands off to the Notifier.
+  - For instant delivery, hands off to the Notifier with an asynchronous invoke (DEL-021).
 - **The Froop resume template:** the layout, and definitions for the macros of every template that `experience-bank` supports. For now that's Jake's Resume (EB-015).
 - **The `resume/` prefix layout.** Resumes are kept for as long as the match exists (DEL-007). The bucket itself comes from `build-and-operation`.
 - **The Notifier Lambda:**
@@ -385,14 +385,14 @@ Consequences:
 - DB-I03 records the current `generation` and `requestId`.
 
 ### DEL-018: Emails are sent at most once
-Status: Accepted (Ryan Fusco, 2026-11-18)
+Status: Accepted (Ryan Fusco, 2026-11-18). Narrowed by DEL-022 (2026-11-23).
 Date: 2026-11-18
 Context: Answers Q3 from the review (part of JDM-Q02). SES can't guarantee exactly-once delivery. If the Notifier sends and then crashes before recording it, a retry sends again. The delivery ground rule says a student hears about each match at most once.
 Decision:
 1. Before sending, the Notifier changes `notifyStatus` from `pending` to `sending` with a conditional write. If that fails, another attempt already owns the email, so it stops.
 2. It sends through SES.
 3. It changes `sending` to `sent`.
-- **Stuck emails:** a match left in `sending` for more than 15 minutes (a crash between steps 1 and 3) is marked `failed` by the next Notifier run and is **not** sent again. The resume is still in the dashboard.
+- **Stuck emails:** a match left in `sending` for more than 15 minutes (a crash between steps 1 and 3) is marked `failed` by the next Notifier run and is **not** sent again. The resume is still in the dashboard. *(Narrowed by DEL-022: this sweep applies to digest matches only.)*
 - **Digests:** the same rule applies to every match in a digest. The digest email lists only matches the Notifier moved to `sending`.
 Alternatives:
 - At least once: send first, then record. Rejected: a crash can cause a duplicate email.
@@ -433,6 +433,34 @@ Alternatives:
 Consequences:
 - The Matcher computes the bucket from the student's delivery mode and the send times above (JDM-007).
 - DEL-Q16 is answered: 13:00 UTC.
+
+### DEL-021: The Renderer hands instant matches to the Notifier with an asynchronous invoke
+Status: Accepted (Ryan Fusco, 2026-11-23)
+Date: 2026-11-23
+Context: DEL-T04 says the Renderer "hands off to the Notifier" for instant matches, and both the delivery and revised-RFC diagrams draw that arrow, but no decision said how. The only Notifier triggers were the digest schedules (DEL-019).
+Decision:
+- After a `new_match` render for an instant-mode match succeeds and its delivery state is written, the Renderer invokes the Notifier asynchronously (Lambda `InvocationType=Event`) with `{schemaVersion: 1, mode: "instant", sub, postingKey, generation}`.
+- The Notifier re-reads the match and sends only if `renderStatus` is `rendered`, the `generation` matches, and `notifyStatus` is `pending`. The at-most-once rule (DEL-018) makes a repeated invoke harmless.
+- A `regenerate` render never invokes the Notifier (DEL-008).
+- If the invoke call itself fails, the Renderer logs it and does not fail the render. The resume is still in the dashboard, and the email is lost, as DEL-018 already accepts.
+Alternatives:
+- An SQS notify queue. Rejected: another queue, DLQ, and alarm for one message type, with no gain over Lambda's own async retries.
+- DynamoDB Streams on the match item. Rejected: a new service to provision and filter, for one transition.
+Consequences:
+- The Renderer's role gains `lambda:InvokeFunction` on the Notifier only (DEL-T07, Requirements Intake).
+- The Notifier has three triggers: the instant invoke, and the hourly and daily schedules.
+
+### DEL-022: No sweep for instant emails stuck in `sending`
+Status: Accepted (Ryan Fusco, 2026-11-23). Narrows DEL-018.
+Date: 2026-11-23
+Context: DEL-018 says a match stuck in `sending` for more than 15 minutes is marked `failed` by the next Notifier run. Digest matches can be found that way, because they keep their GSI2 mark until sent. Instant matches have no mark and no index, so nothing can find them without a scan.
+Decision:
+- **Digest matches:** unchanged. A run that finds a marked match in `sending` for more than 15 minutes marks it `failed` and removes its mark.
+- **Instant matches:** no sweep in v1. A crash between `sending` and `sent` leaves the match in `sending`. No email is resent, and the resume is still in the dashboard.
+Alternatives:
+- A new index or a table scan for `sending` matches. Rejected: an extra index or scan for a rare crash, in a version with only demo users.
+Consequences:
+- The dashboard may show `notifyStatus: sending` on such a match. That's accepted for v1.
 
 ## Interfaces
 

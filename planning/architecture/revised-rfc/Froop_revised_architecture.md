@@ -5,7 +5,7 @@
 | Status | Revised. It reflects Accepted decisions only. |
 | Based on | `architecture/inputs/Froop_inital_architecture.pdf` (RFC 0001, last updated 2026-11-03) |
 | Repository | https://github.com/lukeacampbell/Froop |
-| Last updated | 2026-11-21 |
+| Last updated | 2026-11-23 |
 
 This is the current version of the Froop architecture proposal. It starts from the submitted RFC and applies every **Accepted** decision from `planning/architecture/<area>/architecture.md`. Text marked *(pending XX-Q00)* is still as originally submitted, because the open question that would change it isn't answered yet.
 
@@ -50,6 +50,16 @@ This is the current version of the Froop architecture proposal. It starts from t
 | 2026-11-19 | WEB-013: The API's side of regeneration | API |
 | 2026-11-19 | EB-019: The package creates the upload record, and an unused link expires | Data Model, API |
 | 2026-11-19 | DB-I05: Profile and Settings items (accepted by every owner) | Data Model |
+| 2026-11-21 | SYS-Q05 and WEB-012: no self-service account deletion | Non-Goals |
+| 2026-11-21 | OPS-001 to OPS-012 accepted by every owner | AWS Services (ECR), Infrastructure as Code, CI/CD |
+| 2026-11-21 | DB-001, DB-I01, DB-I03, and DB-I04 (base) accepted by every owner | Data Model |
+| 2026-11-23 | OPS-I01 to OPS-I04 accepted by every owner | Infrastructure as Code, Security, Observability (no text change) |
+| 2026-11-23 | EB-I01 and the EB-019 extension to EB-I03 accepted by every owner | Data Model (no text change) |
+| 2026-11-23 | JDM-011 (WEB-Q08) and the EB-019 amendment: the work record alone triggers regeneration after an upload | Data Model, API |
+| 2026-11-23 | DB-Q10 and DB-I02: the upload-link deadline is separate from TTL; experience items accepted by every owner | Data Model |
+| 2026-11-23 | EB-020: no automatic retry of unclassified sections | Data Model |
+| 2026-11-23 | DEL-021: the Renderer invokes the Notifier for instant emails; DEL-022: no sweep for stuck instant emails | Architecture diagram, Security |
+| 2026-11-23 | WEB-012 and WEB-I01 accepted | Non-Goals, API (no text change) |
 
 ## Team
 
@@ -61,7 +71,7 @@ This is the current version of the Froop architecture proposal. It starts from t
 
 Shared platform/database ownership is confirmed (SYS-Q01/02): Ryan coordinates; Ryan, Graham and Luke share decision authority. The detailed area owners are listed in `planning/architecture/AGENTS.md`.
 
-> **Current discovery scope:** Greenhouse only. All owners agree to the shared scope/demo wording (SYS-Q04). JDM-006/007/008/009 and JDM-I03/I04 record accepted cost, delivery, identity and filter behavior. Other proposals, including regeneration intake JDM-I05, remain pending.
+> **Current discovery scope:** Greenhouse only. All owners agree to the shared scope/demo wording (SYS-Q04). JDM-006/007/008/009 and JDM-I03/I04 record accepted cost, delivery, identity and filter behavior. Regeneration intake JDM-I05 and its JDM-011 clarification are Accepted. Other proposals, including the DB-I04 regeneration amendment, remain pending.
 
 ## Summary
 
@@ -144,11 +154,11 @@ All app data, from user profiles to job matches, lives in DynamoDB. S3 holds upl
 - **Experience items:** each role, bullet, and skill stores both its exact LaTeX `source` and its plain `text`. Both come from the uploaded file without any rewording. Plain text is used for matching and the dashboard, and the source is used to build new resumes.
 - **Header block:** each upload also stores its header block (name and contact details) verbatim, and every generated resume starts with it.
 - **Matches:** matches never expire, so students can look back at them later. Postings still expire.
-- **Upload status:** an upload records its status: `awaiting_file` (link issued), `pending` (file arrived), `parsed`, `parsed_with_unclassified` (when the Bedrock cost cap was reached), or `failed`. A link that's never used reports `expired`, and a student who never uploaded reports `none` (EB-019).
+- **Upload status:** an upload records its status: `awaiting_file` (link issued), `pending` (file arrived), `parsed`, `parsed_with_unclassified` (when the Bedrock cost cap was reached), or `failed`. A link that's never used reports `expired`, and a student who never uploaded reports `none` (EB-019). Sections left unclassified at the cost cap aren't retried automatically; uploading again tries again (EB-020).
 - **Replacing the bank:** a new upload's items are written under its own `docId` and become current in one pointer switch, so no reader ever sees a half-replaced bank (EB-008). Every section is labeled with a category, and skills keep their own categories (EB-016).
 - **postingKey (JDM-008):** `gh.{boardToken}.{jobPostId}`. The same Greenhouse post reached through catalog/private sources has one identity; distinct provider post IDs stay distinct. Conditional puts block duplicate postings and matches.
 - **Postings:** public provider records store title, company, location, description and apply link; source/subscription records hold membership separately. Postings expire 30 days after last seen; readers check expiry without waiting for TTL deletion (DB-I04).
-- **Capacity and durable work:** on-demand table and GSIs (DB-001). DB-I04 defines durable WORK records, dispatcher checkpoints and cost reservations. Pending work has no TTL; recovery scans are paginated. Bank schema expiry clarification remains pending DB-Q10; the regeneration amendment remains separately pending WEB-Q08.
+- **Capacity and durable work:** on-demand table and GSIs (DB-001). DB-I04 defines durable WORK records, dispatcher checkpoints and cost reservations. Pending work has no TTL; recovery scans are paginated. Upload-link deadlines are stored apart from TTL, so a current bank never expires (DB-Q10, DB-I02). The DB-I04 regeneration amendment remains pending.
 - **Indexes:**
   - GSI1: catalog sources, private sources, source subscribers and board postings (DB-I01/I04).
   - GSI2: matches waiting for the next hourly UTC or daily 13:00 UTC digest window (DB-I03; DEL-020).
@@ -177,7 +187,7 @@ Discovery sources are limited to Greenhouse boards (JDM-001). Arbitrary careers 
 | GET | /health | no | Health check |
 | GET | /me | yes | Get profile and settings. The first call creates them, with default settings. |
 | PUT | /me | yes | Replace settings (delivery mode, filters). Invalid settings are rejected. |
-| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice on the upload record (EB-019) When the student opts in, the request is saved before the link is returned (WEB-013). |
+| POST | /uploads | yes | Get a link to upload one LaTeX (`.tex`) file, and record the "regenerate?" choice on the upload record for display (EB-019). When the student opts in, a regeneration work record is saved before the link is returned, and that record alone triggers regeneration once the upload parses (WEB-013, JDM-011). |
 | GET | /experience | yes | List the experience bank, with the upload's status (EB-019) |
 | DELETE | /experience | yes | Delete the experience bank and the uploaded file |
 | GET | /sources | yes | List catalog sources and the user's private sources |
@@ -236,7 +246,7 @@ Each module creates its own Lambdas, queues, roles, and alarms.
 - **Cross-origin access:** the API accepts browser requests only from the dashboard's own address.
 - **Logs:** the API never logs tokens, email addresses, or resume text.
 - **Uploaded LaTeX is never run as code:** the parser only reads it as text and rejects dangerous commands (EB-009). The Renderer compiles only the macros its own template defines, with shell escape off (DEL-002).
-- **IAM:** each Lambda has its own role, with only the access it needs.
+- **IAM:** each Lambda has its own role, with only the access it needs. The Renderer may invoke only the Notifier, to send instant emails (DEL-021).
 - **Secrets:** the only secret is the CloudFront signing key. It's kept in Secrets Manager, and only the api and notifier can read it. Job boards need no keys, and CI uses OIDC instead of AWS keys.
 
 ## Observability

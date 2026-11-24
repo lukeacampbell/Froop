@@ -1,9 +1,9 @@
 # Experience Bank Implementation Plan
 
 Owner: Ryan Fusco.
-Date: 2026-11-19. Phase: Architecture Planning. State: Draft.
+Date: 2026-11-19, revised 2026-11-23. Phase: Architecture Planning. State: Draft.
 
-This plan builds the design in `architecture.md`: decisions EB-001 to EB-019 (Accepted, except EB-004 and EB-011, which are superseded, and EB-007, which is deferred) and interfaces EB-I01 and EB-I03. No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
+This plan builds the design in `architecture.md`: decisions EB-001 to EB-020 (Accepted, except EB-004 and EB-011, which are superseded, and EB-007, which is deferred) and interfaces EB-I01 and EB-I03. No application or test code exists yet. Phase 2 begins only after a human confirms it under `planning/AGENTS.md`.
 
 **What the statuses mean here.** `Planned` means everything the task depends on is Accepted. `Blocked` means a named decision or interface still needs agreement before the task can be built. It doesn't mean the task was tried and failed.
 
@@ -16,10 +16,7 @@ This plan builds the design in `architecture.md`: decisions EB-001 to EB-019 (Ac
 
 | Waiting on | Tasks it blocks |
 |---|---|
-| DB-I02 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
-| DB-I02 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
-| DB-I02 / DB-Q10 and OPS-I01 to I04 provider signoff | See dependency update below |
-| Shared acceptance of DB-I04 and OPS-I05 (JDM-T05 builds the reservation package) | T06 |
+| JDM-T05 (the reservation package, built by `job-discovery-and-matching`) | T06 |
 
 ## Parsing core
 
@@ -51,7 +48,7 @@ Status: Planned
 
 ## Package and upload contract
 
-**Dependency update (2026-11-21):** Luke answered the shared approvals. DB-I01/I03/I04 base, DB-001, OPS decisions and OPS-I05 are Accepted. DB-I02 awaits DB-Q10; OPS-I01 to I04 await Ryan. Existing task sequence/criteria are unchanged; the owner should finalize readiness against these blockers.
+**Dependency update (2026-11-23):** DB-I01, DB-I03, DB-I04 (base), DB-I05, DB-001, every OPS decision, and OPS-I01 to I05 are Accepted, as are EB-I01 and EB-I03 with its extension. DB-I02 is Accepted too (DB-Q10, 2026-11-23), so nothing in this area waits on an agreement.
 ### EB-T01: Build the experience-bank package
 Depends on: EB-010, EB-I03, EB-008, DB-I02, OPS-007
 Acceptance criteria:
@@ -59,19 +56,19 @@ Acceptance criteria:
 2. `get_bank(sub)` resolves the current-upload pointer, then returns the header and the items grouped by section category, with skills grouped by skill category. Unclassified items are marked so the Matcher can exclude them.
 3. `get_items(sub, ids)` returns the items that exist and lists missing IDs without raising an error.
 4. `delete_bank(sub)` deletes every `DOC#` item and the uploaded files, and is safe to repeat.
-5. `upload_status(sub, docId=None)` returns one of `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`, or `expired`, with a reason when failed. It reports `expired` when `expiresAt` has passed with no file. Given a `docId`, it also says whether that upload is the current bank.
+5. `upload_status(sub, docId=None)` returns one of `none`, `awaiting_file`, `pending`, `parsed`, `parsed_with_unclassified`, `failed`, or `expired`, with a reason when failed. It reports `expired` when `uploadExpiresAt` has passed with no file. Given a `docId`, it also says whether that upload is the current bank.
 6. `supported_templates()` returns the macro list used by T04 and by the delivery template (DEL-001).
 7. Every function is scoped to the given `sub`, and no function returns another student's items.
-Status: Blocked (DB-I02 awaits DB-Q10 expiry clarification; DB-I01 Accepted)
+Status: Planned
 
 ### EB-T02: Issue upload links (`create_upload`)
 Depends on: EB-T01, EB-018, EB-019, EB-I01, OPS-I02
 Acceptance criteria:
-1. `create_upload(sub, regenerate=False)` generates a new `docId` and writes an upload record with status `awaiting_file`, `expiresAt`, and the `regenerate` choice.
+1. `create_upload(sub, regenerate=False)` generates a new `docId` and writes an upload record with status `awaiting_file`, `uploadExpiresAt` (not the TTL attribute `expiresAt`, DB-Q10), and the `regenerate` choice. The record has no TTL.
 2. It returns `{docId, url, fields, expiresAt}` for a presigned POST whose policy fixes the key `uploads/{sub}/{docId}.tex`, the content type `application/x-tex`, a size of 1 byte to 1 MB, and a 15-minute expiry.
 3. A test confirms S3 rejects a file over 1 MB, a file with another content type, and a file sent to a different key.
 4. Creating an upload doesn't change the current bank.
-Status: Blocked (EB-T01 / DB-Q10; EB-019 consumer acceptance complete, Ryan to finalize status)
+Status: Planned (after EB-T01)
 
 ## Parser pipeline
 
@@ -84,17 +81,17 @@ Acceptance criteria:
 4. A failed parse leaves the current bank and its pointer untouched, and records `failed` with a reason.
 5. If two uploads finish out of order, only the newer upload becomes current.
 6. A file that arrives after its link expired is ignored and stays `expired`.
-Status: Blocked (EB-T01)
+Status: Planned (after EB-T01 and EB-T04)
 
 ### EB-T06: Classify leftover sections with Bedrock, under the budget
-Depends on: EB-T04, EB-T05, EB-003, EB-013, EB-017, JDM-I04, JDM-T05, OPS-006
+Depends on: EB-T04, EB-T05, EB-003, EB-013, EB-017, EB-020, JDM-I04, JDM-T05, OPS-006
 Acceptance criteria:
 1. Only sections T04 couldn't place are sent to Bedrock, using the configured parser model (`BEDROCK_MODEL_PARSER_LEFTOVERS`).
 2. Before every call, the parser reserves a budget through JDM-I04 with a new attempt ID, using a worst-case estimate (input tokens plus the configured maximum output tokens).
 3. Bedrock must return a category and exact spans. A span that isn't an exact substring of the upload is rejected and logged, never stored.
-4. If the reservation is deferred, the sections are stored as `unclassified`, the status becomes `parsed_with_unclassified`, and a retry is scheduled for `nextAttemptAt`. If it's `blocked_configuration`, the status says so.
+4. If the reservation is deferred, the sections are stored as `unclassified` and the status becomes `parsed_with_unclassified`. Nothing retries them; a new upload tries again (EB-020). If it's `blocked_configuration`, the status says so.
 5. Actual tokens and estimated cost are logged as metrics, without resume text.
-Status: Blocked (JDM-T05; DB-I04 base and OPS-I05 now Accepted)
+Status: Planned (after JDM-T05, which builds the reservation package)
 
 ### EB-T07: Wire the parser Lambda
 Depends on: EB-T05, EB-T06, OPS-004, OPS-I01, OPS-I03, OPS-I04, OPS-T04, OPS-T05
@@ -104,4 +101,4 @@ Acceptance criteria:
 3. The parser's IAM role can only read `uploads/`, write `DOC#` items, call the configured Bedrock model, and use the cost reservation records.
 4. Logs are JSON with `sub` and `docId`, and never contain resume text. Metrics count uploads parsed, failed, and left unclassified.
 5. A retried S3 event for an upload already processed changes nothing.
-Status: Blocked (OPS-I01 to I04 still await Ryan; Luke has accepted)
+Status: Planned (after EB-T05 and EB-T06)
